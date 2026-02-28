@@ -136,7 +136,7 @@ def run_scheduled_job() -> None:
 
     try:
         image_bytes, mime_type = download_photo(file_id)
-        caption = generate_caption(image_bytes, mime_type, tone=tone)
+        caption = generate_caption([(image_bytes, mime_type)], tone=tone)
     except Exception as e:
         logger.error("Scheduler: failed to generate caption — %s", e)
         return

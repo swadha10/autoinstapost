@@ -16,17 +16,22 @@ def _get_client() -> anthropic.Anthropic:
     return _client
 
 
-def generate_caption(image_bytes: bytes, mime_type: str, tone: str = "engaging") -> str:
+def generate_caption(images: list[tuple[bytes, str]], tone: str = "engaging") -> str:
     """
-    Send the image to Claude and return a suggested Instagram caption.
-
+    Send one or more images to Claude and return a suggested Instagram caption.
+    *images* is a list of (image_bytes, mime_type) tuples.
     *tone* can be "engaging", "professional", "funny", "inspirational", etc.
     """
     client = _get_client()
-    b64 = base64.standard_b64encode(image_bytes).decode("utf-8")
+
+    is_carousel = len(images) > 1
+    context = (
+        f"a carousel of {len(images)} photos" if is_carousel else "this photo"
+    )
 
     prompt = (
-        f"You are a real person posting to your personal Instagram. Look at this photo and write a {tone} caption for it.\n\n"
+        f"You are a real person posting {context} to your personal Instagram. "
+        f"Write a {tone} caption for it.\n\n"
         "Rules you must follow:\n"
         "- Write like a human, not a content marketer. Use casual, conversational language — contractions, short sentences, fragments are fine.\n"
         "- Write in first person when it fits naturally.\n"
@@ -40,25 +45,19 @@ def generate_caption(image_bytes: bytes, mime_type: str, tone: str = "engaging")
         "Return ONLY the caption text — no extra commentary."
     )
 
+    content = []
+    for image_bytes, mime_type in images:
+        b64 = base64.standard_b64encode(image_bytes).decode("utf-8")
+        content.append({
+            "type": "image",
+            "source": {"type": "base64", "media_type": mime_type, "data": b64},
+        })
+    content.append({"type": "text", "text": prompt})
+
     message = client.messages.create(
         model="claude-opus-4-6",
         max_tokens=512,
-        messages=[
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "image",
-                        "source": {
-                            "type": "base64",
-                            "media_type": mime_type,
-                            "data": b64,
-                        },
-                    },
-                    {"type": "text", "text": prompt},
-                ],
-            }
-        ],
+        messages=[{"role": "user", "content": content}],
     )
 
     return message.content[0].text.strip()

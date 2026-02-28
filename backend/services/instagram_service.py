@@ -226,3 +226,65 @@ def post_photo(image_url: str, caption: str) -> str:
     container_id = create_container(image_url, caption)
     wait_for_container(container_id)
     return publish_container(container_id)
+
+
+def create_carousel_item_container(image_url: str) -> str:
+    """Create a media container for a single carousel slide (not published on its own)."""
+    account_id = _account_id()
+    resp = httpx.post(
+        f"{GRAPH_BASE}/{account_id}/media",
+        params={
+            "image_url": image_url,
+            "is_carousel_item": "true",
+            "access_token": get_valid_token(),
+        },
+        timeout=30,
+    )
+    if not resp.is_success:
+        raise RuntimeError(f"Carousel item creation failed ({resp.status_code}): {resp.text}")
+    data = resp.json()
+    if "id" not in data:
+        raise RuntimeError(f"Carousel item creation failed: {data}")
+    return data["id"]
+
+
+def create_carousel_container(item_ids: list[str], caption: str) -> str:
+    """Create the carousel wrapper container from individual item container IDs."""
+    account_id = _account_id()
+    resp = httpx.post(
+        f"{GRAPH_BASE}/{account_id}/media",
+        params={
+            "media_type": "CAROUSEL",
+            "caption": caption,
+            "children": ",".join(item_ids),
+            "access_token": get_valid_token(),
+        },
+        timeout=30,
+    )
+    if not resp.is_success:
+        raise RuntimeError(f"Carousel container creation failed ({resp.status_code}): {resp.text}")
+    data = resp.json()
+    if "id" not in data:
+        raise RuntimeError(f"Carousel container creation failed: {data}")
+    return data["id"]
+
+
+def post_carousel(image_urls: list[str], caption: str) -> str:
+    """
+    Post multiple images as an Instagram carousel.
+    Returns the published media ID.
+    """
+    if len(image_urls) < 2 or len(image_urls) > 10:
+        raise ValueError(f"Carousel requires 2–10 images, got {len(image_urls)}")
+
+    # Step 1: create + wait for each item container
+    item_ids = []
+    for url in image_urls:
+        item_id = create_carousel_item_container(url)
+        wait_for_container(item_id)
+        item_ids.append(item_id)
+
+    # Step 2: create carousel container, wait, then publish
+    carousel_id = create_carousel_container(item_ids, caption)
+    wait_for_container(carousel_id)
+    return publish_container(carousel_id)

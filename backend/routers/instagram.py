@@ -11,6 +11,7 @@ from services.drive_service import download_photo
 from services.instagram_service import (
     exchange_for_long_lived_token,
     get_token_status,
+    post_carousel,
     post_photo,
 )
 from services.schedule_service import record_posted_id
@@ -22,7 +23,7 @@ TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
 
 class PostRequest(BaseModel):
-    file_id: str
+    file_ids: list[str]   # one image → single post; 2-10 → carousel
     caption: str
 
 
@@ -30,42 +31,58 @@ class TokenRequest(BaseModel):
     short_lived_token: str
 
 
+def _save_temp(image_bytes: bytes, mime_type: str) -> tuple[Path, str]:
+    """Write image bytes to a temp file and return (path, public_url)."""
+    ext = mime_type.split("/")[-1].replace("jpeg", "jpg")
+    filename = f"{uuid.uuid4().hex}.{ext}"
+    filepath = TEMP_DIR / filename
+    filepath.write_bytes(image_bytes)
+    base_url = os.environ.get("PUBLIC_BASE_URL", "http://localhost:8000").rstrip("/")
+    return filepath, f"{base_url}/temp/{filename}"
+
+
 @router.post("/post")
 def post_to_instagram(req: PostRequest):
-    """Download the Drive photo, save it temporarily, then post to Instagram."""
+    """Download Drive photo(s) and post to Instagram — single or carousel."""
+    if not req.file_ids:
+        raise HTTPException(status_code=400, detail="At least one file_id is required")
+    if len(req.file_ids) > 10:
+        raise HTTPException(status_code=400, detail="Instagram carousels support at most 10 images")
+
+    temp_files: list[Path] = []
     try:
-        image_bytes, mime_type = download_photo(req.file_id)
+        # Download all images and build public URLs
+        image_urls = []
+        for file_id in req.file_ids:
+            image_bytes, mime_type = download_photo(file_id)
+            filepath, url = _save_temp(image_bytes, mime_type)
+            temp_files.append(filepath)
+            image_urls.append(url)
 
-        ext = mime_type.split("/")[-1].replace("jpeg", "jpg")
-        filename = f"{uuid.uuid4().hex}.{ext}"
-        filepath = TEMP_DIR / filename
-        filepath.write_bytes(image_bytes)
+        if len(image_urls) == 1:
+            media_id = post_photo(image_urls[0], req.caption)
+        else:
+            media_id = post_carousel(image_urls, req.caption)
 
-        base_url = os.environ.get("PUBLIC_BASE_URL", "http://localhost:8000").rstrip("/")
-        image_url = f"{base_url}/temp/{filename}"
+        for fid in req.file_ids:
+            record_posted_id(fid)
 
-        media_id = post_photo(image_url, req.caption)
+        return {"success": True, "media_id": media_id, "type": "single" if len(image_urls) == 1 else "carousel"}
 
-        filepath.unlink(missing_ok=True)
-        record_posted_id(req.file_id)
-
-        return {"success": True, "media_id": media_id}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        for fp in temp_files:
+            fp.unlink(missing_ok=True)
 
 
 @router.get("/token-status")
 def token_status():
-    """Return how many days are left on the stored access token."""
     return get_token_status()
 
 
 @router.post("/token-exchange")
 def token_exchange(req: TokenRequest):
-    """
-    Exchange a short-lived Graph API Explorer token for a long-lived one (~60 days).
-    Requires FACEBOOK_APP_ID and FACEBOOK_APP_SECRET in .env.
-    """
     try:
         token = exchange_for_long_lived_token(req.short_lived_token)
         status = get_token_status()

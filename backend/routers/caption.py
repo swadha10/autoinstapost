@@ -10,16 +10,16 @@ router = APIRouter(prefix="/caption", tags=["caption"])
 
 
 class CaptionRequest(BaseModel):
-    file_id: str
+    file_ids: list[str]
     tone: str = "engaging"
 
 
 @router.post("/generate")
 def generate(req: CaptionRequest):
-    """Download image from Drive then ask Claude for a caption."""
+    """Download one or more images from Drive then ask Claude for a caption."""
     try:
-        image_bytes, mime_type = download_photo(req.file_id)
-        caption = generate_caption(image_bytes, mime_type, tone=req.tone)
+        images = [download_photo(fid) for fid in req.file_ids]
+        caption = generate_caption(images, tone=req.tone)
         return {"caption": caption}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

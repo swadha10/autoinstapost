@@ -118,7 +118,7 @@ export default function App() {
 
   const [photos, setPhotos] = useState([]);
   const [postedIds, setPostedIds] = useState([]);
-  const [selectedPhoto, setSelectedPhoto] = useState(null);
+  const [selectedIds, setSelectedIds] = useState([]); // ordered array for carousel
   const [caption, setCaption] = useState("");
   const [tone, setTone] = useState("engaging");
   const [generatingCaption, setGeneratingCaption] = useState(false);
@@ -152,6 +152,7 @@ export default function App() {
       ]);
       setPhotos(photoData.photos);
       setPostedIds(postedIdList);
+      setSelectedIds([]);
       setSavedFolder({ id, name: folderData.name });
       saveFolderToStorage(id, folderData.name);
     } catch (e) {
@@ -170,26 +171,30 @@ export default function App() {
     setSavedFolder(null);
     setFolderId("");
     setPhotos([]);
-    setSelectedPhoto(null);
+    setSelectedIds([]);
     setCaption("");
     setPosted(false);
     setPhotosError("");
     localStorage.removeItem(STORAGE_KEY);
   }
 
-  function handleSelectPhoto(photo) {
-    setSelectedPhoto(photo);
-    setCaption("");
+  function handleTogglePhoto(photo) {
     setPosted(false);
     setPostError("");
+    setSelectedIds((prev) => {
+      if (prev.includes(photo.id)) return prev.filter((id) => id !== photo.id);
+      if (prev.length >= 10) return prev; // Instagram carousel max
+      return [...prev, photo.id];
+    });
+    setCaption("");
   }
 
   async function handleGenerateCaption() {
-    if (!selectedPhoto) return;
+    if (!selectedIds.length) return;
     setGeneratingCaption(true);
     setCaptionError("");
     try {
-      const data = await generateCaption(selectedPhoto.id, tone);
+      const data = await generateCaption(selectedIds, tone);
       setCaption(data.caption);
     } catch (e) {
       setCaptionError(e.message);
@@ -199,11 +204,11 @@ export default function App() {
   }
 
   async function handlePost() {
-    if (!selectedPhoto || !caption.trim()) return;
+    if (!selectedIds.length || !caption.trim()) return;
     setPosting(true);
     setPostError("");
     try {
-      await postToInstagram(selectedPhoto.id, caption);
+      await postToInstagram(selectedIds, caption);
       setPosted(true);
     } catch (e) {
       setPostError(e.message);
@@ -276,16 +281,16 @@ export default function App() {
             {photos.length > 0 && (
               <div style={styles.card}>
                 <div style={styles.sectionTitle}>
-                  2. Select a Photo{" "}
+                  2. Select Photos{" "}
                   <span style={{ fontWeight: 400, color: "#888", fontSize: "13px" }}>
-                    ({photos.length} found)
+                    ({photos.length} found · tap to select · up to 10 for carousel)
                   </span>
                 </div>
                 <PhotoGrid
                   photos={photos}
                   postedIds={postedIds}
-                  selectedId={selectedPhoto?.id}
-                  onSelect={handleSelectPhoto}
+                  selectedIds={selectedIds}
+                  onToggle={handleTogglePhoto}
                   onMarkPosted={async (id) => { await markAsPosted(id); setPostedIds((p) => [...p, id]); }}
                   onUnmarkPosted={async (id) => { await unmarkAsPosted(id); setPostedIds((p) => p.filter((x) => x !== id)); }}
                 />
@@ -293,7 +298,7 @@ export default function App() {
             )}
 
             {/* Step 3: Caption */}
-            {selectedPhoto && (
+            {selectedIds.length > 0 && (
               <div style={styles.card}>
                 <div style={styles.sectionTitle}>3. Write a Caption</div>
                 <CaptionEditor
@@ -315,7 +320,7 @@ export default function App() {
             <div style={styles.card}>
               <div style={styles.sectionTitle}>4. Preview & Post</div>
               <PostPreview
-                photo={selectedPhoto}
+                photos={photos.filter((p) => selectedIds.includes(p.id)).sort((a, b) => selectedIds.indexOf(a.id) - selectedIds.indexOf(b.id))}
                 caption={caption}
                 onPost={handlePost}
                 posting={posting}

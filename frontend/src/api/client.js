@@ -16,21 +16,23 @@ export function photoRawUrl(fileId) {
   return `${BASE}/drive/photo/${fileId}/raw`;
 }
 
-export async function generateCaption(fileId, tone = "engaging") {
+export async function generateCaption(fileIds, tone = "engaging") {
+  const ids = Array.isArray(fileIds) ? fileIds : [fileIds];
   const res = await fetch(`${BASE}/caption/generate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ file_id: fileId, tone }),
+    body: JSON.stringify({ file_ids: ids, tone }),
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
 
-export async function postToInstagram(fileId, caption) {
+export async function postToInstagram(fileIds, caption) {
+  const ids = Array.isArray(fileIds) ? fileIds : [fileIds];
   const res = await fetch(`${BASE}/instagram/post`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ file_id: fileId, caption }),
+    body: JSON.stringify({ file_ids: ids, caption }),
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
