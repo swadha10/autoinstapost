@@ -157,7 +157,7 @@ const s = {
   },
 };
 
-export default function ScheduleTab() {
+export default function ScheduleTab({ savedFolder }) {
   const [config, setConfig] = useState(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -167,10 +167,15 @@ export default function ScheduleTab() {
   const [actioning, setActioning] = useState({});
   const pollRef = useRef(null);
 
-  // Load config on mount
+  // Load config on mount; pre-fill folder_id from savedFolder if config has none
   useEffect(() => {
     getScheduleConfig()
-      .then(setConfig)
+      .then((cfg) => {
+        if (!cfg.folder_id && savedFolder?.id) {
+          cfg.folder_id = savedFolder.id;
+        }
+        setConfig(cfg);
+      })
       .catch(() => {});
   }, []);
 
@@ -323,13 +328,20 @@ export default function ScheduleTab() {
 
         {/* Folder ID */}
         <div style={s.row}>
-          <span style={s.label}>Drive folder ID</span>
-          <input
-            style={s.folderInput}
-            placeholder="Paste Google Drive folder ID…"
-            value={config.folder_id}
-            onChange={(e) => update("folder_id", e.target.value)}
-          />
+          <span style={s.label}>Drive folder</span>
+          {savedFolder?.name && config.folder_id === savedFolder.id ? (
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", background: "#f0f0ff", border: "1px solid #c7c7ff", borderRadius: "8px", padding: "8px 14px" }}>
+              <span>📁</span>
+              <span style={{ fontWeight: 600, fontSize: "14px", color: "#333" }}>{savedFolder.name}</span>
+            </div>
+          ) : (
+            <input
+              style={s.folderInput}
+              placeholder="Paste Google Drive folder ID…"
+              value={config.folder_id}
+              onChange={(e) => update("folder_id", e.target.value)}
+            />
+          )}
         </div>
 
         {/* Tone */}

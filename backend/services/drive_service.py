@@ -35,6 +35,13 @@ def _build_service():
     return build("drive", "v3", credentials=creds, cache_discovery=False)
 
 
+def get_folder_info(folder_id: str) -> dict:
+    """Return id and name for a Drive folder."""
+    service = _build_service()
+    meta = service.files().get(fileId=folder_id, fields="id,name").execute()
+    return {"id": meta["id"], "name": meta["name"]}
+
+
 def list_photos(folder_id: str) -> list[dict]:
     """Return metadata for all image files inside *folder_id*."""
     service = _build_service()

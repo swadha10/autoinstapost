@@ -3,9 +3,18 @@
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
 
-from services.drive_service import download_photo, list_photos
+from services.drive_service import download_photo, get_folder_info, list_photos
 
 router = APIRouter(prefix="/drive", tags=["drive"])
+
+
+@router.get("/folder/{folder_id}")
+def get_folder(folder_id: str):
+    """Return the name of a Google Drive folder by ID."""
+    try:
+        return get_folder_info(folder_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/photos")

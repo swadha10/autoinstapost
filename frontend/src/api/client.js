@@ -1,5 +1,11 @@
 const BASE = "";  // proxied by Vite in dev
 
+export async function getFolderInfo(folderId) {
+  const res = await fetch(`${BASE}/drive/folder/${encodeURIComponent(folderId)}`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 export async function fetchPhotos(folderId) {
   const res = await fetch(`${BASE}/drive/photos?folder_id=${encodeURIComponent(folderId)}`);
   if (!res.ok) throw new Error(await res.text());

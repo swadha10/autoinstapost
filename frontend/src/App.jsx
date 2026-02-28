@@ -1,9 +1,11 @@
-import { useState } from "react";
-import { fetchPhotos, generateCaption, postToInstagram } from "./api/client";
+import { useEffect, useState } from "react";
+import { fetchPhotos, generateCaption, getFolderInfo, postToInstagram } from "./api/client";
 import CaptionEditor from "./components/CaptionEditor";
 import PhotoGrid from "./components/PhotoGrid";
 import PostPreview from "./components/PostPreview";
 import ScheduleTab from "./components/ScheduleTab";
+
+const STORAGE_KEY = "autoinstapost_folder";
 
 const styles = {
   app: { minHeight: "100vh", background: "#fafafa" },
@@ -18,7 +20,6 @@ const styles = {
   headerSub: { color: "rgba(255,255,255,0.8)", fontSize: "13px" },
   tabBar: {
     display: "flex",
-    gap: "0",
     borderBottom: "2px solid #eee",
     background: "#fff",
     padding: "0 24px",
@@ -34,7 +35,6 @@ const styles = {
     background: "none",
     border: "none",
     borderBottom: active ? "2px solid #c13584" : "2px solid transparent",
-    transition: "color 0.15s",
   }),
   main: { maxWidth: "1100px", margin: "0 auto", padding: "24px 20px", display: "flex", gap: "28px", flexWrap: "wrap" },
   left: { flex: "1 1 520px" },
@@ -61,6 +61,27 @@ const styles = {
     fontSize: "14px",
     whiteSpace: "nowrap",
   }),
+  folderChip: {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    background: "#f0f0ff",
+    border: "1px solid #c7c7ff",
+    borderRadius: "8px",
+    padding: "10px 14px",
+    marginBottom: "4px",
+  },
+  folderIcon: { fontSize: "18px" },
+  folderName: { fontWeight: 600, fontSize: "14px", color: "#333", flex: 1 },
+  changeBtn: {
+    fontSize: "12px",
+    color: "#888",
+    background: "none",
+    border: "none",
+    cursor: "pointer",
+    textDecoration: "underline",
+    padding: 0,
+  },
   error: {
     background: "#fff0f0",
     border: "1px solid #fcc",
@@ -74,14 +95,28 @@ const styles = {
   scheduleMain: { maxWidth: "720px", margin: "0 auto", padding: "24px 20px" },
 };
 
+function saveFolderToStorage(id, name) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ id, name }));
+}
+
+function loadFolderFromStorage() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+  } catch {
+    return null;
+  }
+}
+
 export default function App() {
   const [activeTab, setActiveTab] = useState("manual");
 
+  // Folder state
   const [folderId, setFolderId] = useState("");
-  const [photos, setPhotos] = useState([]);
+  const [savedFolder, setSavedFolder] = useState(null); // { id, name }
   const [loadingPhotos, setLoadingPhotos] = useState(false);
   const [photosError, setPhotosError] = useState("");
 
+  const [photos, setPhotos] = useState([]);
   const [selectedPhoto, setSelectedPhoto] = useState(null);
   const [caption, setCaption] = useState("");
   const [tone, setTone] = useState("engaging");
@@ -92,8 +127,16 @@ export default function App() {
   const [posted, setPosted] = useState(false);
   const [postError, setPostError] = useState("");
 
-  async function handleLoadPhotos() {
-    if (!folderId.trim()) return;
+  // Restore saved folder on mount and auto-load photos
+  useEffect(() => {
+    const stored = loadFolderFromStorage();
+    if (stored?.id) {
+      setSavedFolder(stored);
+      loadPhotos(stored.id);
+    }
+  }, []);
+
+  async function loadPhotos(id) {
     setLoadingPhotos(true);
     setPhotosError("");
     setPhotos([]);
@@ -101,13 +144,34 @@ export default function App() {
     setCaption("");
     setPosted(false);
     try {
-      const data = await fetchPhotos(folderId.trim());
-      setPhotos(data.photos);
+      const [photoData, folderData] = await Promise.all([
+        fetchPhotos(id),
+        getFolderInfo(id),
+      ]);
+      setPhotos(photoData.photos);
+      setSavedFolder({ id, name: folderData.name });
+      saveFolderToStorage(id, folderData.name);
     } catch (e) {
       setPhotosError(e.message);
     } finally {
       setLoadingPhotos(false);
     }
+  }
+
+  function handleLoadPhotos() {
+    if (!folderId.trim()) return;
+    loadPhotos(folderId.trim());
+  }
+
+  function handleChangeFolder() {
+    setSavedFolder(null);
+    setFolderId("");
+    setPhotos([]);
+    setSelectedPhoto(null);
+    setCaption("");
+    setPosted(false);
+    setPhotosError("");
+    localStorage.removeItem(STORAGE_KEY);
   }
 
   function handleSelectPhoto(photo) {
@@ -154,7 +218,6 @@ export default function App() {
         </div>
       </header>
 
-      {/* Tab bar */}
       <div style={styles.tabBar}>
         <button style={styles.tab(activeTab === "manual")} onClick={() => setActiveTab("manual")}>
           Manual
@@ -166,27 +229,43 @@ export default function App() {
 
       {activeTab === "manual" ? (
         <main style={styles.main}>
-          {/* Left column */}
           <div style={styles.left}>
-            {/* Step 1: Load photos */}
+            {/* Step 1: Folder */}
             <div style={styles.card}>
               <div style={styles.sectionTitle}>1. Connect Google Drive Folder</div>
-              <div style={styles.folderRow}>
-                <input
-                  style={styles.input}
-                  placeholder="Paste Google Drive folder ID..."
-                  value={folderId}
-                  onChange={(e) => setFolderId(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleLoadPhotos()}
-                />
-                <button style={styles.loadBtn(loadingPhotos)} onClick={handleLoadPhotos} disabled={loadingPhotos}>
-                  {loadingPhotos ? "Loading..." : "Load Photos"}
-                </button>
-              </div>
-              <p style={styles.hint}>
-                Find your folder ID in the Drive URL:{" "}
-                <code>drive.google.com/drive/folders/<strong>FOLDER_ID</strong></code>
-              </p>
+
+              {savedFolder ? (
+                <div style={styles.folderChip}>
+                  <span style={styles.folderIcon}>📁</span>
+                  <span style={styles.folderName}>{savedFolder.name}</span>
+                  <button style={styles.changeBtn} onClick={handleChangeFolder}>
+                    Change folder
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div style={styles.folderRow}>
+                    <input
+                      style={styles.input}
+                      placeholder="Paste Google Drive folder ID..."
+                      value={folderId}
+                      onChange={(e) => setFolderId(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleLoadPhotos()}
+                    />
+                    <button style={styles.loadBtn(loadingPhotos)} onClick={handleLoadPhotos} disabled={loadingPhotos}>
+                      {loadingPhotos ? "Loading..." : "Load Photos"}
+                    </button>
+                  </div>
+                  <p style={styles.hint}>
+                    Find your folder ID in the Drive URL:{" "}
+                    <code>drive.google.com/drive/folders/<strong>FOLDER_ID</strong></code>
+                  </p>
+                </>
+              )}
+
+              {loadingPhotos && savedFolder && (
+                <p style={{ ...styles.hint, marginTop: "8px" }}>Loading photos…</p>
+              )}
               {photosError && <div style={styles.error}>{photosError}</div>}
             </div>
 
@@ -222,7 +301,6 @@ export default function App() {
             {postError && <div style={styles.error}>{postError}</div>}
           </div>
 
-          {/* Right column — preview */}
           <div style={styles.right}>
             <div style={styles.card}>
               <div style={styles.sectionTitle}>4. Preview & Post</div>
@@ -238,7 +316,7 @@ export default function App() {
         </main>
       ) : (
         <div style={styles.scheduleMain}>
-          <ScheduleTab />
+          <ScheduleTab savedFolder={savedFolder} />
         </div>
       )}
     </div>
