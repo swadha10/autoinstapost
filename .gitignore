@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+dist/
+
+# Env & secrets
+.env
+backend/service_account.json
+
+# Node
+node_modules/
+frontend/dist/
+
+# OS
+.DS_Store
+
+# Temp uploads
+/tmp/autoinstapost/
