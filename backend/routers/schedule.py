@@ -43,6 +43,13 @@ def set_config(config: ScheduleConfig, request: Request):
     return {"success": True, "config": data}
 
 
+@router.get("/posted-ids")
+def get_posted_ids():
+    """Return the set of Drive file IDs that have already been posted."""
+    from services.schedule_service import load_posted_ids
+    return sorted(load_posted_ids())
+
+
 @router.get("/pending")
 def get_pending():
     return load_pending()

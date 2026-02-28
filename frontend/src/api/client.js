@@ -36,6 +36,12 @@ export async function postToInstagram(fileId, caption) {
   return res.json();
 }
 
+export async function getPostedIds() {
+  const res = await fetch(`${BASE}/schedule/posted-ids`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json(); // string[]
+}
+
 export async function getScheduleConfig() {
   const res = await fetch(`${BASE}/schedule/config`);
   if (!res.ok) throw new Error(await res.text());

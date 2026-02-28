@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { fetchPhotos, generateCaption, getFolderInfo, postToInstagram } from "./api/client";
+import { fetchPhotos, generateCaption, getFolderInfo, getPostedIds, postToInstagram } from "./api/client";
 import CaptionEditor from "./components/CaptionEditor";
 import PhotoGrid from "./components/PhotoGrid";
 import PostPreview from "./components/PostPreview";
@@ -117,6 +117,7 @@ export default function App() {
   const [photosError, setPhotosError] = useState("");
 
   const [photos, setPhotos] = useState([]);
+  const [postedIds, setPostedIds] = useState([]);
   const [selectedPhoto, setSelectedPhoto] = useState(null);
   const [caption, setCaption] = useState("");
   const [tone, setTone] = useState("engaging");
@@ -144,11 +145,13 @@ export default function App() {
     setCaption("");
     setPosted(false);
     try {
-      const [photoData, folderData] = await Promise.all([
+      const [photoData, folderData, postedIdList] = await Promise.all([
         fetchPhotos(id),
         getFolderInfo(id),
+        getPostedIds(),
       ]);
       setPhotos(photoData.photos);
+      setPostedIds(postedIdList);
       setSavedFolder({ id, name: folderData.name });
       saveFolderToStorage(id, folderData.name);
     } catch (e) {
@@ -278,7 +281,7 @@ export default function App() {
                     ({photos.length} found)
                   </span>
                 </div>
-                <PhotoGrid photos={photos} selectedId={selectedPhoto?.id} onSelect={handleSelectPhoto} />
+                <PhotoGrid photos={photos} postedIds={postedIds} selectedId={selectedPhoto?.id} onSelect={handleSelectPhoto} />
               </div>
             )}
 
