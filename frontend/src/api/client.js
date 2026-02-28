@@ -56,6 +56,12 @@ export async function unmarkAsPosted(fileId) {
   return res.json();
 }
 
+export async function getServerTimezone() {
+  const res = await fetch(`${BASE}/schedule/timezone`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 export async function getScheduleConfig() {
   const res = await fetch(`${BASE}/schedule/config`);
   if (!res.ok) throw new Error(await res.text());

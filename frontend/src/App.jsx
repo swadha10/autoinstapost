@@ -141,7 +141,7 @@ export default function App() {
     setLoadingPhotos(true);
     setPhotosError("");
     setPhotos([]);
-    setSelectedPhoto(null);
+    setSelectedIds([]);
     setCaption("");
     setPosted(false);
     try {

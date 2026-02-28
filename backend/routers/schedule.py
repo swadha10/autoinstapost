@@ -26,6 +26,19 @@ class ScheduleConfig(BaseModel):
     require_approval: bool = True
 
 
+@router.get("/timezone")
+def get_timezone():
+    import datetime
+    import tzlocal
+    tz = tzlocal.get_localzone()
+    now = datetime.datetime.now(tz)
+    return {
+        "timezone": str(tz),
+        "utc_offset": now.strftime("%z"),
+        "current_time": now.strftime("%I:%M %p"),
+    }
+
+
 @router.get("/config")
 def get_config():
     return load_config()

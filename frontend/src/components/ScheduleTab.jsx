@@ -3,6 +3,7 @@ import {
   approvePost,
   getScheduleConfig,
   getPendingPosts,
+  getServerTimezone,
   rejectPost,
   saveScheduleConfig,
 } from "../api/client";
@@ -159,6 +160,7 @@ const s = {
 
 export default function ScheduleTab({ savedFolder }) {
   const [config, setConfig] = useState(null);
+  const [tzInfo, setTzInfo] = useState(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState("");
@@ -167,16 +169,15 @@ export default function ScheduleTab({ savedFolder }) {
   const [actioning, setActioning] = useState({});
   const pollRef = useRef(null);
 
-  // Load config on mount; pre-fill folder_id from savedFolder if config has none
+  // Load config and timezone on mount
   useEffect(() => {
     getScheduleConfig()
       .then((cfg) => {
-        if (!cfg.folder_id && savedFolder?.id) {
-          cfg.folder_id = savedFolder.id;
-        }
+        if (!cfg.folder_id && savedFolder?.id) cfg.folder_id = savedFolder.id;
         setConfig(cfg);
       })
       .catch(() => {});
+    getServerTimezone().then(setTzInfo).catch(() => {});
   }, []);
 
   // Poll pending posts every 30s when require_approval is on
@@ -285,6 +286,15 @@ export default function ScheduleTab({ savedFolder }) {
             onChange={(e) => update("minute", Number(e.target.value))}
             title="Minute (0–59)"
           />
+          {tzInfo && (
+            <span style={{
+              fontSize: "12px", color: "#888", background: "#f5f5f5",
+              border: "1px solid #e0e0e0", borderRadius: "6px",
+              padding: "4px 10px", whiteSpace: "nowrap",
+            }}>
+              🌐 {tzInfo.timezone} (UTC{tzInfo.utc_offset})
+            </span>
+          )}
         </div>
 
         {/* Cadence */}
