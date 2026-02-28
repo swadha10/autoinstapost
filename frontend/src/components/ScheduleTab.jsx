@@ -264,28 +264,39 @@ export default function ScheduleTab({ savedFolder }) {
           </button>
         </div>
 
-        {/* Time */}
+        {/* Time — 12h AM/PM */}
         <div style={s.row}>
           <span style={s.label}>Post time</span>
-          <input
-            type="number"
-            min={0}
-            max={23}
-            style={s.input}
-            value={config.hour}
-            onChange={(e) => update("hour", Number(e.target.value))}
-            title="Hour (0–23)"
-          />
-          <span style={{ color: "#888" }}>:</span>
-          <input
-            type="number"
-            min={0}
-            max={59}
-            style={s.input}
-            value={config.minute}
-            onChange={(e) => update("minute", Number(e.target.value))}
-            title="Minute (0–59)"
-          />
+          {(() => {
+            const h24 = config.hour ?? 8;
+            const period = h24 < 12 ? "AM" : "PM";
+            const hour12 = h24 === 0 ? 12 : h24 > 12 ? h24 - 12 : h24;
+            function setTime(newH12, newPeriod) {
+              const h = newPeriod === "AM"
+                ? (newH12 === 12 ? 0 : newH12)
+                : (newH12 === 12 ? 12 : newH12 + 12);
+              update("hour", h);
+            }
+            return (
+              <>
+                <input
+                  type="number" min={1} max={12}
+                  style={s.input}
+                  value={hour12}
+                  onChange={(e) => setTime(Math.min(12, Math.max(1, Number(e.target.value))), period)}
+                />
+                <span style={{ color: "#888" }}>:</span>
+                <input
+                  type="number" min={0} max={59}
+                  style={s.input}
+                  value={String(config.minute).padStart(2, "0")}
+                  onChange={(e) => update("minute", Math.min(59, Math.max(0, Number(e.target.value))))}
+                />
+                <button style={s.toggle(period === "AM")} onClick={() => setTime(hour12, "AM")}>AM</button>
+                <button style={s.toggle(period === "PM")} onClick={() => setTime(hour12, "PM")}>PM</button>
+              </>
+            );
+          })()}
           {tzInfo && (
             <span style={{
               fontSize: "12px", color: "#888", background: "#f5f5f5",
@@ -364,6 +375,25 @@ export default function ScheduleTab({ savedFolder }) {
               </button>
             ))}
           </div>
+        </div>
+
+        {/* Default caption */}
+        <div style={{ marginBottom: "14px" }}>
+          <span style={{ ...s.label, display: "block", marginBottom: "6px" }}>
+            Default caption
+            <span style={{ fontWeight: 400, color: "#999", fontSize: "12px", marginLeft: "8px" }}>
+              used when AI generation fails
+            </span>
+          </span>
+          <textarea
+            style={{
+              width: "100%", minHeight: "72px", border: "1px solid #ddd", borderRadius: "8px",
+              padding: "10px 12px", fontSize: "13px", lineHeight: "1.5", resize: "vertical",
+              fontFamily: "inherit", outline: "none", color: "#444", boxSizing: "border-box",
+            }}
+            value={config.default_caption ?? ""}
+            onChange={(e) => update("default_caption", e.target.value)}
+          />
         </div>
 
         {/* Approval mode */}

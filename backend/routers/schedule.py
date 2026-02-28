@@ -14,6 +14,9 @@ from services.schedule_service import (
 router = APIRouter(prefix="/schedule", tags=["schedule"])
 
 
+from services.schedule_service import DEFAULT_CAPTION  # noqa: E402 (after router import)
+
+
 class ScheduleConfig(BaseModel):
     enabled: bool = False
     hour: int = 8
@@ -24,6 +27,7 @@ class ScheduleConfig(BaseModel):
     folder_id: str = ""
     tone: str = "engaging"
     require_approval: bool = True
+    default_caption: str = DEFAULT_CAPTION
 
 
 @router.get("/timezone")

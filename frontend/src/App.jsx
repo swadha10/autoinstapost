@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { fetchPhotos, generateCaption, getFolderInfo, getPostedIds, markAsPosted, postToInstagram, unmarkAsPosted } from "./api/client";
+import { fetchPhotos, generateCaption, getFolderInfo, getPostedIds, getScheduleConfig, markAsPosted, postToInstagram, unmarkAsPosted } from "./api/client";
 import CaptionEditor from "./components/CaptionEditor";
 import PhotoGrid from "./components/PhotoGrid";
 import PostPreview from "./components/PostPreview";
@@ -128,13 +128,18 @@ export default function App() {
   const [posted, setPosted] = useState(false);
   const [postError, setPostError] = useState("");
 
-  // Restore saved folder on mount and auto-load photos
+  const [defaultCaption, setDefaultCaption] = useState("");
+
+  // Restore saved folder on mount and auto-load photos; fetch default caption
   useEffect(() => {
     const stored = loadFolderFromStorage();
     if (stored?.id) {
       setSavedFolder(stored);
       loadPhotos(stored.id);
     }
+    getScheduleConfig()
+      .then((cfg) => setDefaultCaption(cfg.default_caption || ""))
+      .catch(() => {});
   }, []);
 
   async function loadPhotos(id) {
@@ -309,7 +314,28 @@ export default function App() {
                   onGenerate={handleGenerateCaption}
                   loading={generatingCaption}
                 />
-                {captionError && <div style={styles.error}>{captionError}</div>}
+                {captionError && (
+                  <div style={styles.error}>
+                    {captionError}
+                    {defaultCaption && (
+                      <div style={{ marginTop: "8px" }}>
+                        <button
+                          onClick={() => { setCaption(defaultCaption); setCaptionError(""); }}
+                          style={{
+                            padding: "6px 14px", background: "#fff", border: "1px solid #fcc",
+                            borderRadius: "6px", cursor: "pointer", fontSize: "12px",
+                            color: "#c00", fontWeight: 600,
+                          }}
+                        >
+                          Use default caption instead
+                        </button>
+                        <div style={{ marginTop: "6px", fontSize: "12px", color: "#888", fontStyle: "italic" }}>
+                          "{defaultCaption}"
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 

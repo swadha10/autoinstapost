@@ -22,6 +22,8 @@ POSTED_FILE = DATA_DIR / "posted_photos.json"
 TEMP_DIR = Path("/tmp/autoinstapost")
 TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
+DEFAULT_CAPTION = "If you are feeling lazy use claude to post your work on insta w/o lifting a finger :)"
+
 DEFAULT_CONFIG = {
     "enabled": False,
     "hour": 8,
@@ -32,6 +34,7 @@ DEFAULT_CONFIG = {
     "folder_id": "",
     "tone": "engaging",
     "require_approval": True,
+    "default_caption": DEFAULT_CAPTION,
 }
 
 
@@ -139,7 +142,12 @@ def run_scheduled_job() -> None:
         caption = generate_caption([(image_bytes, mime_type)], tone=tone)
     except Exception as e:
         logger.error("Scheduler: failed to generate caption — %s", e)
-        return
+        fallback = config.get("default_caption", "").strip()
+        if not fallback:
+            logger.warning("Scheduler: no default caption set — skipping post.")
+            return
+        caption = fallback
+        logger.info("Scheduler: using default caption as fallback.")
 
     if not config.get("require_approval", True):
         try:
