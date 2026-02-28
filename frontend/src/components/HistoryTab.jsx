@@ -1,12 +1,31 @@
 import { useEffect, useState } from "react";
-import { getPostHistory } from "../api/client";
-import { photoRawUrl } from "../api/client";
+import { getPostHistory, getScheduleStatus, photoRawUrl } from "../api/client";
 
 const SOURCE_LABEL = {
   manual: { text: "Manual", bg: "#e8f0fe", color: "#3c5fa8" },
   scheduled: { text: "Scheduled", bg: "#f0e6ff", color: "#7b3fa8" },
   approved: { text: "Approved", bg: "#fff3e0", color: "#a86a00" },
 };
+
+function formatNextRun(isoString) {
+  if (!isoString) return null;
+  const d = new Date(isoString);
+  const now = new Date();
+  const diffMs = d - now;
+  const diffH = diffMs / 3600000;
+  const diffMin = diffMs / 60000;
+
+  const timeStr = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const dateStr = d.toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" });
+
+  if (diffMin < 1) return { label: "in less than a minute", sub: timeStr };
+  if (diffMin < 60) return { label: `in ${Math.round(diffMin)} min`, sub: timeStr };
+  if (diffH < 24) {
+    const today = now.toDateString() === d.toDateString();
+    return { label: `${today ? "today" : "tomorrow"} at ${timeStr}`, sub: dateStr };
+  }
+  return { label: `${dateStr} at ${timeStr}`, sub: null };
+}
 
 const s = {
   card: {
@@ -16,7 +35,7 @@ const s = {
     boxShadow: "0 2px 12px #0001",
     marginBottom: "20px",
   },
-  sectionTitle: { fontSize: "16px", fontWeight: 700, marginBottom: "16px", color: "#111" },
+  sectionTitle: { fontSize: "16px", fontWeight: 700, color: "#111" },
   row: {
     display: "flex",
     gap: "14px",
@@ -77,7 +96,7 @@ const s = {
     overflow: "hidden",
   },
   meta: { fontSize: "11px", color: "#aaa", marginTop: "4px" },
-  error: {
+  errorMsg: {
     fontSize: "12px",
     color: "#c00",
     background: "#fff0f0",
@@ -99,17 +118,35 @@ const s = {
   },
 };
 
+function CheckItem({ check }) {
+  return (
+    <div style={{ display: "flex", gap: "10px", alignItems: "flex-start", padding: "8px 0", borderBottom: "1px solid #f5f5f5" }}>
+      <span style={{ fontSize: "14px", marginTop: "1px", flexShrink: 0 }}>
+        {check.ok ? "✅" : "❌"}
+      </span>
+      <div>
+        <span style={{ fontSize: "13px", fontWeight: 600, color: "#333" }}>{check.name}</span>
+        <span style={{ fontSize: "13px", color: check.ok ? "#555" : "#c00", marginLeft: "8px" }}>
+          {check.message}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export default function HistoryTab() {
   const [history, setHistory] = useState([]);
+  const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  async function fetchHistory() {
+  async function fetchAll() {
     setLoading(true);
     setError("");
     try {
-      const data = await getPostHistory();
-      setHistory(data);
+      const [hist, stat] = await Promise.all([getPostHistory(), getScheduleStatus()]);
+      setHistory(hist);
+      setStatus(stat);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -117,27 +154,75 @@ export default function HistoryTab() {
     }
   }
 
-  useEffect(() => {
-    fetchHistory();
-  }, []);
+  useEffect(() => { fetchAll(); }, []);
+
+  const nextRun = status?.next_run ? formatNextRun(status.next_run) : null;
 
   return (
     <div>
+      {/* ── Schedule Status ── */}
       <div style={s.card}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
-          <div style={s.sectionTitle} style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: "#111" }}>
-            Post History
-          </div>
-          <button style={s.refreshBtn} onClick={fetchHistory} disabled={loading}>
+          <div style={s.sectionTitle}>Schedule Status</div>
+          <button style={s.refreshBtn} onClick={fetchAll} disabled={loading}>
             {loading ? "Loading…" : "Refresh"}
           </button>
         </div>
 
         {error && (
-          <div style={{ background: "#fff0f0", border: "1px solid #fcc", borderRadius: "8px", padding: "10px 14px", color: "#c00", fontSize: "13px" }}>
+          <div style={{ background: "#fff0f0", border: "1px solid #fcc", borderRadius: "8px", padding: "10px 14px", color: "#c00", fontSize: "13px", marginBottom: "12px" }}>
             {error}
           </div>
         )}
+
+        {/* Next run banner */}
+        {status && (
+          <div style={{
+            background: nextRun ? (status.all_ok ? "#f0f7ff" : "#fffbf0") : "#f5f5f5",
+            border: `1px solid ${nextRun ? (status.all_ok ? "#b8d4f8" : "#f5d88a") : "#e0e0e0"}`,
+            borderRadius: "10px",
+            padding: "14px 16px",
+            marginBottom: "16px",
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+          }}>
+            <span style={{ fontSize: "24px" }}>{nextRun ? (status.all_ok ? "🕐" : "⚠️") : "💤"}</span>
+            <div>
+              {nextRun ? (
+                <>
+                  <div style={{ fontSize: "14px", fontWeight: 700, color: "#111" }}>
+                    Next post {nextRun.label}
+                  </div>
+                  {nextRun.sub && (
+                    <div style={{ fontSize: "12px", color: "#888", marginTop: "2px" }}>{nextRun.sub}</div>
+                  )}
+                  {!status.all_ok && (
+                    <div style={{ fontSize: "12px", color: "#a86000", marginTop: "4px" }}>
+                      Fix the issues below before the next run
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div style={{ fontSize: "14px", fontWeight: 600, color: "#888" }}>
+                  No scheduled post — enable auto-schedule in the Schedule tab
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Validation checklist */}
+        {status?.checks && (
+          <div>
+            {status.checks.map((c) => <CheckItem key={c.name} check={c} />)}
+          </div>
+        )}
+      </div>
+
+      {/* ── Post History ── */}
+      <div style={s.card}>
+        <div style={{ ...s.sectionTitle, marginBottom: "16px" }}>Post History</div>
 
         {!loading && !error && history.length === 0 && (
           <div style={s.emptyNote}>No posts yet. Posts will appear here once you start sharing.</div>
@@ -187,13 +272,9 @@ export default function HistoryTab() {
                   )}
                 </div>
 
-                {entry.caption && (
-                  <div style={s.caption}>{entry.caption}</div>
-                )}
+                {entry.caption && <div style={s.caption}>{entry.caption}</div>}
 
-                {!ok && entry.error && (
-                  <div style={s.error}>{entry.error}</div>
-                )}
+                {!ok && entry.error && <div style={s.errorMsg}>{entry.error}</div>}
 
                 <div style={s.meta}>
                   {new Date(entry.created_at).toLocaleString()}

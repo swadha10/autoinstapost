@@ -101,3 +101,9 @@ export async function getPostHistory() {
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
+
+export async function getScheduleStatus() {
+  const res = await fetch(`${BASE}/schedule/status`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}

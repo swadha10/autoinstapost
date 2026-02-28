@@ -117,6 +117,82 @@ def get_history():
     return load_history()
 
 
+@router.get("/status")
+def get_status(request: Request):
+    """Return next scheduled run time + pre-flight validation checks."""
+    import os
+    from services.schedule_service import load_posted_ids
+
+    config = load_config()
+    scheduler = request.app.state.scheduler
+    job = scheduler.get_job("auto_post")
+    next_run = job.next_run_time.isoformat() if (job and job.next_run_time) else None
+
+    checks = []
+
+    # 1. Schedule enabled
+    enabled = config.get("enabled", False)
+    checks.append({
+        "name": "Auto-schedule",
+        "ok": enabled,
+        "message": "Enabled" if enabled else "Disabled — turn on in the Schedule tab",
+    })
+
+    # 2. Folder configured
+    folder_id = config.get("folder_id", "").strip()
+    checks.append({
+        "name": "Drive folder",
+        "ok": bool(folder_id),
+        "message": "Folder configured" if folder_id else "No folder ID set — add one in the Schedule tab",
+    })
+
+    # 3. Fresh photos available
+    if folder_id:
+        try:
+            from services.drive_service import list_photos
+            photos = list_photos(folder_id)
+            posted = load_posted_ids()
+            fresh = [p for p in photos if p["id"] not in posted]
+            checks.append({
+                "name": "Fresh photos",
+                "ok": len(fresh) > 0,
+                "message": f"{len(fresh)} unposted photo{'s' if len(fresh) != 1 else ''} available"
+                           if fresh else "All photos already posted — unmark some in the Manual tab",
+            })
+        except Exception as e:
+            checks.append({"name": "Fresh photos", "ok": False, "message": f"Drive error: {e}"})
+    else:
+        checks.append({"name": "Fresh photos", "ok": False, "message": "Set a folder first"})
+
+    # 4. Public URL reachable by Instagram
+    public_url = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
+    url_ok = bool(public_url) and "localhost" not in public_url and "127.0.0.1" not in public_url
+    checks.append({
+        "name": "Public image URL",
+        "ok": url_ok,
+        "message": public_url if url_ok else "PUBLIC_BASE_URL not set or points to localhost — Instagram can't fetch images",
+    })
+
+    # 5. Instagram token valid
+    try:
+        from services.instagram_service import get_token_status
+        ts = get_token_status()
+        token_ok = ts.get("valid", False)
+        days = ts.get("days_left")
+        if token_ok and days is not None:
+            msg = f"Valid — {days} day{'s' if days != 1 else ''} left"
+        elif token_ok:
+            msg = "Valid"
+        else:
+            msg = "Invalid or expired — exchange a new token in the Manual tab"
+        checks.append({"name": "Instagram token", "ok": token_ok, "message": msg})
+    except Exception as e:
+        checks.append({"name": "Instagram token", "ok": False, "message": str(e)})
+
+    all_ok = all(c["ok"] for c in checks)
+    return {"next_run": next_run, "checks": checks, "all_ok": all_ok}
+
+
 # ---------------------------------------------------------------------------
 # Internal helper — kept here to avoid circular imports with main.py
 # ---------------------------------------------------------------------------
