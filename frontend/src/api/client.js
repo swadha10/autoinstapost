@@ -95,3 +95,9 @@ export async function rejectPost(id) {
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
+
+export async function getPostHistory() {
+  const res = await fetch(`${BASE}/schedule/history`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}

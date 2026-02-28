@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { fetchPhotos, generateCaption, getFolderInfo, getPostedIds, getScheduleConfig, markAsPosted, postToInstagram, unmarkAsPosted } from "./api/client";
 import CaptionEditor from "./components/CaptionEditor";
+import HistoryTab from "./components/HistoryTab";
 import PhotoGrid from "./components/PhotoGrid";
 import PostPreview from "./components/PostPreview";
 import ScheduleTab from "./components/ScheduleTab";
@@ -238,6 +239,9 @@ export default function App() {
         <button style={styles.tab(activeTab === "schedule")} onClick={() => setActiveTab("schedule")}>
           Schedule
         </button>
+        <button style={styles.tab(activeTab === "history")} onClick={() => setActiveTab("history")}>
+          History
+        </button>
       </div>
 
       {activeTab === "manual" ? (
@@ -355,9 +359,13 @@ export default function App() {
             </div>
           </div>
         </main>
-      ) : (
+      ) : activeTab === "schedule" ? (
         <div style={styles.scheduleMain}>
           <ScheduleTab savedFolder={savedFolder} />
+        </div>
+      ) : (
+        <div style={styles.scheduleMain}>
+          <HistoryTab />
         </div>
       )}
     </div>

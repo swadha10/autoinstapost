@@ -6,7 +6,9 @@ from pydantic import BaseModel
 from services.schedule_service import (
     approve_pending_post,
     load_config,
+    load_history,
     load_pending,
+    log_post_attempt,
     reject_pending_post,
     save_config,
 )
@@ -108,6 +110,11 @@ def reject_post(post_id: str):
     if not found:
         raise HTTPException(status_code=404, detail="Pending post not found")
     return {"success": True}
+
+
+@router.get("/history")
+def get_history():
+    return load_history()
 
 
 # ---------------------------------------------------------------------------

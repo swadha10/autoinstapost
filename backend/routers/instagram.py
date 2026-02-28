@@ -14,7 +14,7 @@ from services.instagram_service import (
     post_carousel,
     post_photo,
 )
-from services.schedule_service import record_posted_id
+from services.schedule_service import log_post_attempt, record_posted_id
 
 router = APIRouter(prefix="/instagram", tags=["instagram"])
 
@@ -67,9 +67,20 @@ def post_to_instagram(req: PostRequest):
         for fid in req.file_ids:
             record_posted_id(fid)
 
-        return {"success": True, "media_id": media_id, "type": "single" if len(image_urls) == 1 else "carousel"}
+        post_type = "single" if len(image_urls) == 1 else "carousel"
+        log_post_attempt(
+            file_ids=req.file_ids, file_names=req.file_ids,
+            caption=req.caption, status="success",
+            source="manual", media_id=media_id,
+        )
+        return {"success": True, "media_id": media_id, "type": post_type}
 
     except Exception as e:
+        log_post_attempt(
+            file_ids=req.file_ids, file_names=req.file_ids,
+            caption=req.caption, status="failed",
+            source="manual", error=str(e),
+        )
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         for fp in temp_files:

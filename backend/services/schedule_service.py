@@ -18,6 +18,7 @@ DATA_DIR = Path(__file__).parent.parent / "data"
 CONFIG_FILE = DATA_DIR / "schedule_config.json"
 PENDING_FILE = DATA_DIR / "pending_posts.json"
 POSTED_FILE = DATA_DIR / "posted_photos.json"
+HISTORY_FILE = DATA_DIR / "post_history.json"
 
 TEMP_DIR = Path("/tmp/autoinstapost")
 TEMP_DIR.mkdir(parents=True, exist_ok=True)
@@ -82,6 +83,43 @@ def load_pending() -> list[dict]:
 def save_pending(posts: list[dict]) -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     PENDING_FILE.write_text(json.dumps(posts, indent=2))
+
+
+def load_history() -> list[dict]:
+    if not HISTORY_FILE.exists():
+        return []
+    try:
+        return json.loads(HISTORY_FILE.read_text())
+    except Exception:
+        return []
+
+
+def log_post_attempt(
+    *,
+    file_ids: list[str],
+    file_names: list[str],
+    caption: str,
+    status: str,          # "success" | "failed"
+    source: str,          # "manual" | "scheduled" | "approved"
+    error: str = "",
+    media_id: str = "",
+) -> None:
+    """Append one entry to the post history log."""
+    entry = {
+        "id": str(uuid.uuid4()),
+        "file_ids": file_ids,
+        "file_names": file_names,
+        "caption": caption,
+        "status": status,
+        "source": source,
+        "error": error,
+        "media_id": media_id,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    history = load_history()
+    history.insert(0, entry)  # newest first
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    HISTORY_FILE.write_text(json.dumps(history, indent=2))
 
 
 def _post_image(file_id: str, caption: str) -> str:
@@ -151,10 +189,20 @@ def run_scheduled_job() -> None:
 
     if not config.get("require_approval", True):
         try:
-            _post_image(file_id, caption)
+            media_id = _post_image(file_id, caption)
             record_posted_id(file_id)
+            log_post_attempt(
+                file_ids=[file_id], file_names=[file_name],
+                caption=caption, status="success",
+                source="scheduled", media_id=media_id,
+            )
             logger.info("Scheduler: auto-posted %s", file_name)
         except Exception as e:
+            log_post_attempt(
+                file_ids=[file_id], file_names=[file_name],
+                caption=caption, status="failed",
+                source="scheduled", error=str(e),
+            )
             logger.error("Scheduler: failed to post — %s", e)
     else:
         post = {
@@ -179,7 +227,20 @@ def approve_pending_post(post_id: str) -> bool:
     if post is None:
         return False
 
-    _post_image(post["file_id"], post["caption"])
+    try:
+        media_id = _post_image(post["file_id"], post["caption"])
+        log_post_attempt(
+            file_ids=[post["file_id"]], file_names=[post.get("file_name", post["file_id"])],
+            caption=post["caption"], status="success",
+            source="approved", media_id=media_id,
+        )
+    except Exception as e:
+        log_post_attempt(
+            file_ids=[post["file_id"]], file_names=[post.get("file_name", post["file_id"])],
+            caption=post["caption"], status="failed",
+            source="approved", error=str(e),
+        )
+        raise
 
     save_pending([p for p in pending if p["id"] != post_id])
     return True
