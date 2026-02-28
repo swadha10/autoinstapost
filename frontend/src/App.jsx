@@ -3,6 +3,7 @@ import { fetchPhotos, generateCaption, postToInstagram } from "./api/client";
 import CaptionEditor from "./components/CaptionEditor";
 import PhotoGrid from "./components/PhotoGrid";
 import PostPreview from "./components/PostPreview";
+import ScheduleTab from "./components/ScheduleTab";
 
 const styles = {
   app: { minHeight: "100vh", background: "#fafafa" },
@@ -15,6 +16,26 @@ const styles = {
   },
   headerTitle: { color: "#fff", fontSize: "22px", fontWeight: 800, letterSpacing: "-0.5px" },
   headerSub: { color: "rgba(255,255,255,0.8)", fontSize: "13px" },
+  tabBar: {
+    display: "flex",
+    gap: "0",
+    borderBottom: "2px solid #eee",
+    background: "#fff",
+    padding: "0 24px",
+  },
+  tab: (active) => ({
+    padding: "12px 24px",
+    fontSize: "14px",
+    fontWeight: active ? 700 : 500,
+    color: active ? "#c13584" : "#666",
+    borderBottom: active ? "2px solid #c13584" : "2px solid transparent",
+    marginBottom: "-2px",
+    cursor: "pointer",
+    background: "none",
+    border: "none",
+    borderBottom: active ? "2px solid #c13584" : "2px solid transparent",
+    transition: "color 0.15s",
+  }),
   main: { maxWidth: "1100px", margin: "0 auto", padding: "24px 20px", display: "flex", gap: "28px", flexWrap: "wrap" },
   left: { flex: "1 1 520px" },
   right: { flex: "0 0 380px" },
@@ -50,9 +71,12 @@ const styles = {
     marginTop: "10px",
   },
   hint: { fontSize: "12px", color: "#999", marginTop: "6px" },
+  scheduleMain: { maxWidth: "720px", margin: "0 auto", padding: "24px 20px" },
 };
 
 export default function App() {
+  const [activeTab, setActiveTab] = useState("manual");
+
   const [folderId, setFolderId] = useState("");
   const [photos, setPhotos] = useState([]);
   const [loadingPhotos, setLoadingPhotos] = useState(false);
@@ -130,77 +154,93 @@ export default function App() {
         </div>
       </header>
 
-      <main style={styles.main}>
-        {/* Left column */}
-        <div style={styles.left}>
-          {/* Step 1: Load photos */}
-          <div style={styles.card}>
-            <div style={styles.sectionTitle}>1. Connect Google Drive Folder</div>
-            <div style={styles.folderRow}>
-              <input
-                style={styles.input}
-                placeholder="Paste Google Drive folder ID..."
-                value={folderId}
-                onChange={(e) => setFolderId(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleLoadPhotos()}
-              />
-              <button style={styles.loadBtn(loadingPhotos)} onClick={handleLoadPhotos} disabled={loadingPhotos}>
-                {loadingPhotos ? "Loading..." : "Load Photos"}
-              </button>
-            </div>
-            <p style={styles.hint}>
-              Find your folder ID in the Drive URL:{" "}
-              <code>drive.google.com/drive/folders/<strong>FOLDER_ID</strong></code>
-            </p>
-            {photosError && <div style={styles.error}>{photosError}</div>}
-          </div>
+      {/* Tab bar */}
+      <div style={styles.tabBar}>
+        <button style={styles.tab(activeTab === "manual")} onClick={() => setActiveTab("manual")}>
+          Manual
+        </button>
+        <button style={styles.tab(activeTab === "schedule")} onClick={() => setActiveTab("schedule")}>
+          Schedule
+        </button>
+      </div>
 
-          {/* Step 2: Pick a photo */}
-          {photos.length > 0 && (
+      {activeTab === "manual" ? (
+        <main style={styles.main}>
+          {/* Left column */}
+          <div style={styles.left}>
+            {/* Step 1: Load photos */}
             <div style={styles.card}>
-              <div style={styles.sectionTitle}>
-                2. Select a Photo{" "}
-                <span style={{ fontWeight: 400, color: "#888", fontSize: "13px" }}>
-                  ({photos.length} found)
-                </span>
+              <div style={styles.sectionTitle}>1. Connect Google Drive Folder</div>
+              <div style={styles.folderRow}>
+                <input
+                  style={styles.input}
+                  placeholder="Paste Google Drive folder ID..."
+                  value={folderId}
+                  onChange={(e) => setFolderId(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleLoadPhotos()}
+                />
+                <button style={styles.loadBtn(loadingPhotos)} onClick={handleLoadPhotos} disabled={loadingPhotos}>
+                  {loadingPhotos ? "Loading..." : "Load Photos"}
+                </button>
               </div>
-              <PhotoGrid photos={photos} selectedId={selectedPhoto?.id} onSelect={handleSelectPhoto} />
+              <p style={styles.hint}>
+                Find your folder ID in the Drive URL:{" "}
+                <code>drive.google.com/drive/folders/<strong>FOLDER_ID</strong></code>
+              </p>
+              {photosError && <div style={styles.error}>{photosError}</div>}
             </div>
-          )}
 
-          {/* Step 3: Caption */}
-          {selectedPhoto && (
-            <div style={styles.card}>
-              <div style={styles.sectionTitle}>3. Write a Caption</div>
-              <CaptionEditor
-                caption={caption}
-                tone={tone}
-                onChange={setCaption}
-                onToneChange={setTone}
-                onGenerate={handleGenerateCaption}
-                loading={generatingCaption}
-              />
-              {captionError && <div style={styles.error}>{captionError}</div>}
-            </div>
-          )}
+            {/* Step 2: Pick a photo */}
+            {photos.length > 0 && (
+              <div style={styles.card}>
+                <div style={styles.sectionTitle}>
+                  2. Select a Photo{" "}
+                  <span style={{ fontWeight: 400, color: "#888", fontSize: "13px" }}>
+                    ({photos.length} found)
+                  </span>
+                </div>
+                <PhotoGrid photos={photos} selectedId={selectedPhoto?.id} onSelect={handleSelectPhoto} />
+              </div>
+            )}
 
-          {postError && <div style={styles.error}>{postError}</div>}
-        </div>
+            {/* Step 3: Caption */}
+            {selectedPhoto && (
+              <div style={styles.card}>
+                <div style={styles.sectionTitle}>3. Write a Caption</div>
+                <CaptionEditor
+                  caption={caption}
+                  tone={tone}
+                  onChange={setCaption}
+                  onToneChange={setTone}
+                  onGenerate={handleGenerateCaption}
+                  loading={generatingCaption}
+                />
+                {captionError && <div style={styles.error}>{captionError}</div>}
+              </div>
+            )}
 
-        {/* Right column — preview */}
-        <div style={styles.right}>
-          <div style={styles.card}>
-            <div style={styles.sectionTitle}>4. Preview & Post</div>
-            <PostPreview
-              photo={selectedPhoto}
-              caption={caption}
-              onPost={handlePost}
-              posting={posting}
-              posted={posted}
-            />
+            {postError && <div style={styles.error}>{postError}</div>}
           </div>
+
+          {/* Right column — preview */}
+          <div style={styles.right}>
+            <div style={styles.card}>
+              <div style={styles.sectionTitle}>4. Preview & Post</div>
+              <PostPreview
+                photo={selectedPhoto}
+                caption={caption}
+                onPost={handlePost}
+                posting={posting}
+                posted={posted}
+              />
+            </div>
+          </div>
+        </main>
+      ) : (
+        <div style={styles.scheduleMain}>
+          <ScheduleTab />
         </div>
-      </main>
+      )}
     </div>
   );
 }

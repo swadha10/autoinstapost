@@ -1,0 +1,11 @@
+{
+  "enabled": false,
+  "hour": 8,
+  "minute": 0,
+  "cadence": "daily",
+  "every_n_days": 1,
+  "weekdays": [0, 1, 2, 3, 4],
+  "folder_id": "",
+  "tone": "engaging",
+  "require_approval": true
+}

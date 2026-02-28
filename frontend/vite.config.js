@@ -8,6 +8,7 @@ export default defineConfig({
       "/drive": "http://localhost:8000",
       "/caption": "http://localhost:8000",
       "/instagram": "http://localhost:8000",
+      "/schedule": "http://localhost:8000",
       "/temp": "http://localhost:8000",
     },
   },

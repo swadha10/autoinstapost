@@ -18,3 +18,4 @@ frontend/dist/
 
 # Temp uploads
 /tmp/autoinstapost/
+backend/data/token.json

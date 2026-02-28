@@ -6,16 +6,36 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+from contextlib import asynccontextmanager
+
+from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from routers import caption, drive, instagram
+from routers.schedule import _reschedule, router as schedule_router
+from services.schedule_service import load_config
 
 TEMP_DIR = Path("/tmp/autoinstapost")
 TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
-app = FastAPI(title="AutoInstaPost API", version="1.0.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    scheduler = BackgroundScheduler()
+    app.state.scheduler = scheduler
+
+    # Apply any previously saved schedule on startup
+    config = load_config()
+    _reschedule(scheduler, config)
+
+    scheduler.start()
+    yield
+    scheduler.shutdown(wait=False)
+
+
+app = FastAPI(title="AutoInstaPost API", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -31,6 +51,7 @@ app.mount("/temp", StaticFiles(directory=str(TEMP_DIR)), name="temp")
 app.include_router(drive.router)
 app.include_router(caption.router)
 app.include_router(instagram.router)
+app.include_router(schedule_router)
 
 
 @app.get("/health")

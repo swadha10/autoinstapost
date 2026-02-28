@@ -2,10 +2,11 @@
 
 import base64
 import os
+from typing import Optional
 
 import anthropic
 
-_client: anthropic.Anthropic | None = None
+_client: Optional[anthropic.Anthropic] = None
 
 
 def _get_client() -> anthropic.Anthropic:
