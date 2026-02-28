@@ -26,9 +26,18 @@ def generate_caption(image_bytes: bytes, mime_type: str, tone: str = "engaging")
     b64 = base64.standard_b64encode(image_bytes).decode("utf-8")
 
     prompt = (
-        f"You are an Instagram content creator. Look at this photo and write a {tone} "
-        "Instagram caption for it. Include 5-10 relevant hashtags at the end. "
-        "Keep the caption under 200 words. Return ONLY the caption text — no extra commentary."
+        f"You are a real person posting to your personal Instagram. Look at this photo and write a {tone} caption for it.\n\n"
+        "Rules you must follow:\n"
+        "- Write like a human, not a content marketer. Use casual, conversational language — contractions, short sentences, fragments are fine.\n"
+        "- Write in first person when it fits naturally.\n"
+        "- Reference the feeling or moment behind the photo, not just what's visible.\n"
+        "- Never open with 'Embracing', 'Capturing', 'Celebrating', or similar AI-tell openers.\n"
+        "- Avoid overused words: vibrant, stunning, breathtaking, magical, journey, adventure.\n"
+        "- Do not use em-dashes (—) as a stylistic device.\n"
+        "- No calls-to-action like 'Tag a friend' or 'Let me know in the comments'.\n"
+        "- End with 3 to 6 relevant lowercase hashtags only — no more.\n"
+        "- Keep the whole caption under 150 words.\n\n"
+        "Return ONLY the caption text — no extra commentary."
     )
 
     message = client.messages.create(

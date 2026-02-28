@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 DATA_DIR = Path(__file__).parent.parent / "data"
 CONFIG_FILE = DATA_DIR / "schedule_config.json"
 PENDING_FILE = DATA_DIR / "pending_posts.json"
+POSTED_FILE = DATA_DIR / "posted_photos.json"
 
 TEMP_DIR = Path("/tmp/autoinstapost")
 TEMP_DIR.mkdir(parents=True, exist_ok=True)
@@ -46,6 +47,24 @@ def load_config() -> dict:
 def save_config(config: dict) -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     CONFIG_FILE.write_text(json.dumps(config, indent=2))
+
+
+def load_posted_ids() -> set[str]:
+    """Return set of file IDs that have already been posted."""
+    if not POSTED_FILE.exists():
+        return set()
+    try:
+        return set(json.loads(POSTED_FILE.read_text()))
+    except Exception:
+        return set()
+
+
+def record_posted_id(file_id: str) -> None:
+    """Append a file ID to the posted history so it is never reused."""
+    ids = load_posted_ids()
+    ids.add(file_id)
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    POSTED_FILE.write_text(json.dumps(sorted(ids), indent=2))
 
 
 def load_pending() -> list[dict]:
@@ -104,7 +123,13 @@ def run_scheduled_job() -> None:
         logger.warning("Scheduler: no photos found in folder %s — skipping.", folder_id)
         return
 
-    photo = random.choice(photos)
+    posted_ids = load_posted_ids()
+    unused = [p for p in photos if p["id"] not in posted_ids]
+    if not unused:
+        logger.warning("Scheduler: all %d photos have already been posted — skipping to avoid reuse.", len(photos))
+        return
+
+    photo = random.choice(unused)
     file_id = photo["id"]
     file_name = photo.get("name", file_id)
     tone = config.get("tone", "engaging")
@@ -119,6 +144,7 @@ def run_scheduled_job() -> None:
     if not config.get("require_approval", True):
         try:
             _post_image(file_id, caption)
+            record_posted_id(file_id)
             logger.info("Scheduler: auto-posted %s", file_name)
         except Exception as e:
             logger.error("Scheduler: failed to post — %s", e)
@@ -133,6 +159,8 @@ def run_scheduled_job() -> None:
         pending = load_pending()
         pending.append(post)
         save_pending(pending)
+        # Record as used now so the same photo isn't queued again before approval
+        record_posted_id(file_id)
         logger.info("Scheduler: queued %s for approval (id=%s)", file_name, post["id"])
 
 
