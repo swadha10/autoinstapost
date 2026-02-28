@@ -13,6 +13,7 @@ from services.instagram_service import (
     get_token_status,
     post_photo,
 )
+from services.schedule_service import record_posted_id
 
 router = APIRouter(prefix="/instagram", tags=["instagram"])
 
@@ -46,6 +47,7 @@ def post_to_instagram(req: PostRequest):
         media_id = post_photo(image_url, req.caption)
 
         filepath.unlink(missing_ok=True)
+        record_posted_id(req.file_id)
 
         return {"success": True, "media_id": media_id}
     except Exception as e:

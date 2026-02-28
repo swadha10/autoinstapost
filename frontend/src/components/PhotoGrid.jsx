@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { photoRawUrl } from "../api/client";
 
 const s = {
@@ -13,9 +14,9 @@ const s = {
     overflow: "hidden",
     border: selected ? "3px solid #e1306c" : "3px solid transparent",
     boxShadow: selected ? "0 0 0 2px #e1306c44" : "0 2px 8px #0001",
-    transition: "border 0.15s, box-shadow 0.15s, opacity 0.15s",
+    transition: "border 0.15s, opacity 0.15s",
     background: "#fff",
-    opacity: dimmed ? 0.55 : 1,
+    opacity: dimmed ? 0.5 : 1,
     position: "relative",
   }),
   img: {
@@ -32,18 +33,32 @@ const s = {
     overflow: "hidden",
     textOverflow: "ellipsis",
   },
-  badge: {
+  sharedBadge: {
     position: "absolute",
     top: "6px",
-    right: "6px",
+    left: "6px",
     background: "rgba(0,0,0,0.55)",
     color: "#fff",
     fontSize: "10px",
     fontWeight: 700,
     padding: "2px 7px",
     borderRadius: "20px",
-    backdropFilter: "blur(4px)",
   },
+  markBtn: (shared) => ({
+    position: "absolute",
+    top: "6px",
+    right: "6px",
+    background: shared ? "rgba(255,255,255,0.9)" : "rgba(0,0,0,0.45)",
+    color: shared ? "#555" : "#fff",
+    fontSize: "10px",
+    fontWeight: 700,
+    padding: "3px 8px",
+    borderRadius: "20px",
+    border: "none",
+    cursor: "pointer",
+    lineHeight: 1.4,
+    backdropFilter: "blur(4px)",
+  }),
   sectionHeader: {
     display: "flex",
     alignItems: "center",
@@ -57,16 +72,8 @@ const s = {
     textTransform: "uppercase",
     color: fresh ? "#405de6" : "#aaa",
   }),
-  sectionCount: {
-    fontSize: "11px",
-    color: "#bbb",
-    fontWeight: 500,
-  },
-  divider: {
-    flex: 1,
-    height: "1px",
-    background: "#f0f0f0",
-  },
+  sectionCount: { fontSize: "11px", color: "#bbb", fontWeight: 500 },
+  divider: { flex: 1, height: "1px", background: "#f0f0f0" },
 };
 
 function Section({ label, count, fresh, children }) {
@@ -82,17 +89,28 @@ function Section({ label, count, fresh, children }) {
   );
 }
 
-function PhotoCard({ photo, selected, dimmed, showBadge, onSelect }) {
+function PhotoCard({ photo, selected, dimmed, shared, onSelect, onMark }) {
+  const [busy, setBusy] = useState(false);
+
+  async function handleMark(e) {
+    e.stopPropagation();
+    setBusy(true);
+    try { await onMark(photo.id); } finally { setBusy(false); }
+  }
+
   return (
     <div style={s.card(selected, dimmed)} onClick={() => onSelect(photo)}>
       <img src={photoRawUrl(photo.id)} alt={photo.name} style={s.img} loading="lazy" />
-      {showBadge && <div style={s.badge}>Shared</div>}
+      {shared && <div style={s.sharedBadge}>Shared</div>}
+      <button style={s.markBtn(shared)} onClick={handleMark} disabled={busy} title={shared ? "Move back to Fresh shots" : "Mark as already shared"}>
+        {busy ? "…" : shared ? "↩ Unmark" : "✓ Mark shared"}
+      </button>
       <div style={s.name}>{photo.name}</div>
     </div>
   );
 }
 
-export default function PhotoGrid({ photos, postedIds = [], selectedId, onSelect }) {
+export default function PhotoGrid({ photos, postedIds = [], selectedId, onSelect, onMarkPosted, onUnmarkPosted }) {
   if (!photos.length) {
     return <p style={{ color: "#888", padding: "16px 0" }}>No photos found in this folder.</p>;
   }
@@ -111,8 +129,9 @@ export default function PhotoGrid({ photos, postedIds = [], selectedId, onSelect
               photo={photo}
               selected={photo.id === selectedId}
               dimmed={false}
-              showBadge={false}
+              shared={false}
               onSelect={onSelect}
+              onMark={onMarkPosted}
             />
           ))}
         </Section>
@@ -126,8 +145,9 @@ export default function PhotoGrid({ photos, postedIds = [], selectedId, onSelect
               photo={photo}
               selected={photo.id === selectedId}
               dimmed={true}
-              showBadge={true}
+              shared={true}
               onSelect={onSelect}
+              onMark={onUnmarkPosted}
             />
           ))}
         </Section>

@@ -50,6 +50,25 @@ def get_posted_ids():
     return sorted(load_posted_ids())
 
 
+@router.post("/posted-ids/{file_id}")
+def mark_as_posted(file_id: str):
+    """Manually mark a photo as already shared (e.g. posted before tracking existed)."""
+    from services.schedule_service import record_posted_id
+    record_posted_id(file_id)
+    return {"success": True}
+
+
+@router.delete("/posted-ids/{file_id}")
+def unmark_as_posted(file_id: str):
+    """Remove a photo from the posted history so it can be reused."""
+    from services.schedule_service import load_posted_ids, POSTED_FILE
+    ids = load_posted_ids()
+    ids.discard(file_id)
+    POSTED_FILE.parent.mkdir(parents=True, exist_ok=True)
+    POSTED_FILE.write_text(__import__("json").dumps(sorted(ids), indent=2))
+    return {"success": True}
+
+
 @router.get("/pending")
 def get_pending():
     return load_pending()

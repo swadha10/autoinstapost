@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { fetchPhotos, generateCaption, getFolderInfo, getPostedIds, postToInstagram } from "./api/client";
+import { fetchPhotos, generateCaption, getFolderInfo, getPostedIds, markAsPosted, postToInstagram, unmarkAsPosted } from "./api/client";
 import CaptionEditor from "./components/CaptionEditor";
 import PhotoGrid from "./components/PhotoGrid";
 import PostPreview from "./components/PostPreview";
@@ -281,7 +281,14 @@ export default function App() {
                     ({photos.length} found)
                   </span>
                 </div>
-                <PhotoGrid photos={photos} postedIds={postedIds} selectedId={selectedPhoto?.id} onSelect={handleSelectPhoto} />
+                <PhotoGrid
+                  photos={photos}
+                  postedIds={postedIds}
+                  selectedId={selectedPhoto?.id}
+                  onSelect={handleSelectPhoto}
+                  onMarkPosted={async (id) => { await markAsPosted(id); setPostedIds((p) => [...p, id]); }}
+                  onUnmarkPosted={async (id) => { await unmarkAsPosted(id); setPostedIds((p) => p.filter((x) => x !== id)); }}
+                />
               </div>
             )}
 

@@ -39,7 +39,19 @@ export async function postToInstagram(fileId, caption) {
 export async function getPostedIds() {
   const res = await fetch(`${BASE}/schedule/posted-ids`);
   if (!res.ok) throw new Error(await res.text());
-  return res.json(); // string[]
+  return res.json();
+}
+
+export async function markAsPosted(fileId) {
+  const res = await fetch(`${BASE}/schedule/posted-ids/${fileId}`, { method: "POST" });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function unmarkAsPosted(fileId) {
+  const res = await fetch(`${BASE}/schedule/posted-ids/${fileId}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
 }
 
 export async function getScheduleConfig() {
