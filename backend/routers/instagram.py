@@ -13,8 +13,9 @@ from services.instagram_service import (
     get_token_status,
     post_carousel,
     post_photo,
+    search_instagram_location,
 )
-from services.schedule_service import log_post_attempt, record_posted_id
+from services.schedule_service import _compress_for_instagram, extract_photo_metadata, log_post_attempt, record_posted_id
 
 router = APIRouter(prefix="/instagram", tags=["instagram"])
 
@@ -33,7 +34,8 @@ class TokenRequest(BaseModel):
 
 def _save_temp(image_bytes: bytes, mime_type: str) -> tuple[Path, str]:
     """Write image bytes to a temp file and return (path, public_url)."""
-    ext = mime_type.split("/")[-1].replace("jpeg", "jpg")
+    ext = mime_type.split("/")[-1].lower()
+    ext = "jpg" if ext in ("jpeg", "jpg") else ("png" if ext == "png" else "jpg")
     filename = f"{uuid.uuid4().hex}.{ext}"
     filepath = TEMP_DIR / filename
     filepath.write_bytes(image_bytes)
@@ -49,6 +51,49 @@ def _save_temp(image_bytes: bytes, mime_type: str) -> tuple[Path, str]:
     return filepath, f"{base_url}/temp/{filename}"
 
 
+def _verify_image_url(url: str, base_url: str) -> None:
+    """Probe the URL as Instagram's crawler would — raises HTTPException on failure."""
+    import httpx as _httpx
+    try:
+        probe = _httpx.get(
+            url,
+            timeout=12,
+            follow_redirects=True,
+            headers={
+                "User-Agent": (
+                    "facebookexternalhit/1.1 "
+                    "(+http://www.facebook.com/externalhit_uatext.php)"
+                ),
+                "Range": "bytes=0-2047",
+            },
+        )
+        if probe.status_code not in (200, 206):
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Image URL returned HTTP {probe.status_code}. "
+                    f"Tunnel may be down or PUBLIC_BASE_URL is wrong (current: {base_url}). "
+                    "Update .env and restart the backend."
+                ),
+            )
+        ct = probe.headers.get("content-type", "")
+        if not ct.lower().startswith("image/"):
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Image URL returned Content-Type='{ct}' — not an image. "
+                    "Cloudflare is likely showing a bot-challenge page to Instagram's crawler. "
+                    "Switch PUBLIC_BASE_URL from trycloudflare.com to the named tunnel "
+                    "(ca5619f4-cb52-40a6-929e-eb12000b7728.cfargotunnel.com) and restart the backend."
+                ),
+            )
+    except _httpx.RequestError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot reach image URL: {exc}. Check cloudflared and PUBLIC_BASE_URL in .env.",
+        ) from exc
+
+
 @router.post("/post")
 def post_to_instagram(req: PostRequest):
     """Download Drive photo(s) and post to Instagram — single or carousel."""
@@ -59,18 +104,30 @@ def post_to_instagram(req: PostRequest):
 
     temp_files: list[Path] = []
     try:
-        # Download all images and build public URLs
+        # Download all images, extract metadata from first, compress, and build public URLs
         image_urls = []
-        for file_id in req.file_ids:
+        base_url = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
+        location_id = None
+        for i, file_id in enumerate(req.file_ids):
             image_bytes, mime_type = download_photo(file_id)
-            filepath, url = _save_temp(image_bytes, mime_type)
+            if i == 0:
+                # Extract GPS before compression strips EXIF; resolve Instagram location
+                meta = extract_photo_metadata(image_bytes)
+                gps = meta.get("gps")
+                if gps:
+                    location_id = search_instagram_location(*gps)
+            image_bytes = _compress_for_instagram(image_bytes)
+            filepath, url = _save_temp(image_bytes, "image/jpeg")
             temp_files.append(filepath)
             image_urls.append(url)
 
+        # Verify first image is reachable and is actually an image (not an HTML interstitial)
+        _verify_image_url(image_urls[0], base_url)
+
         if len(image_urls) == 1:
-            media_id = post_photo(image_urls[0], req.caption)
+            media_id = post_photo(image_urls[0], req.caption, location_id=location_id)
         else:
-            media_id = post_carousel(image_urls, req.caption)
+            media_id = post_carousel(image_urls, req.caption, location_id=location_id)
 
         for fid in req.file_ids:
             record_posted_id(fid)

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getPostHistory, getScheduleStatus, photoRawUrl } from "../api/client";
+import { getPostHistory, getScheduleStatus, runScheduleNow, photoRawUrl } from "../api/client";
 
 const SOURCE_LABEL = {
   manual: { text: "Manual", bg: "#e8f0fe", color: "#3c5fa8" },
@@ -139,6 +139,8 @@ export default function HistoryTab() {
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [runningNow, setRunningNow] = useState(false);
+  const [runMsg, setRunMsg] = useState("");
 
   async function fetchAll() {
     setLoading(true);
@@ -154,6 +156,20 @@ export default function HistoryTab() {
     }
   }
 
+  async function handleRunNow() {
+    setRunningNow(true);
+    setRunMsg("");
+    try {
+      const res = await runScheduleNow();
+      setRunMsg(res.message || "Job triggered — check history in ~30s");
+      setTimeout(() => fetchAll(), 32000);
+    } catch (e) {
+      setRunMsg(`Error: ${e.message}`);
+    } finally {
+      setRunningNow(false);
+    }
+  }
+
   useEffect(() => { fetchAll(); }, []);
 
   const nextRun = status?.next_run ? formatNextRun(status.next_run) : null;
@@ -164,14 +180,29 @@ export default function HistoryTab() {
       <div style={s.card}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
           <div style={s.sectionTitle}>Schedule Status</div>
-          <button style={s.refreshBtn} onClick={fetchAll} disabled={loading}>
-            {loading ? "Loading…" : "Refresh"}
-          </button>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button
+              style={{ ...s.refreshBtn, background: runningNow ? "#f5f5f5" : "#1a1a2e", color: runningNow ? "#aaa" : "#fff", borderColor: "#1a1a2e" }}
+              onClick={handleRunNow}
+              disabled={runningNow || loading}
+            >
+              {runningNow ? "Running…" : "▶ Run Now"}
+            </button>
+            <button style={s.refreshBtn} onClick={fetchAll} disabled={loading}>
+              {loading ? "Loading…" : "Refresh"}
+            </button>
+          </div>
         </div>
 
         {error && (
           <div style={{ background: "#fff0f0", border: "1px solid #fcc", borderRadius: "8px", padding: "10px 14px", color: "#c00", fontSize: "13px", marginBottom: "12px" }}>
             {error}
+          </div>
+        )}
+
+        {runMsg && (
+          <div style={{ background: runMsg.startsWith("Error") ? "#fff0f0" : "#f0f7ff", border: `1px solid ${runMsg.startsWith("Error") ? "#fcc" : "#b8d4f8"}`, borderRadius: "8px", padding: "10px 14px", color: runMsg.startsWith("Error") ? "#c00" : "#1a4a80", fontSize: "13px", marginBottom: "12px" }}>
+            {runMsg}
           </div>
         )}
 

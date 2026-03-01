@@ -70,4 +70,48 @@ A chronological log of every user prompt since the start of this project.
 
 30. **Even on first-time load, make the Google Drive folder the default.** — on mount, if no `localStorage` entry exists, fall back to `folder_id` from the schedule config.
 
-31. **Store all prompts since start in a chronicle file.** ← *you are here*
+31. **Store all prompts since start in a chronicle file.**
+
+---
+
+## Session 3 — Reliability, Cost & Gemini
+
+32. **Same error "Carousel item creation failed (400)". Debug and fix it permanently.** — root cause: raw camera JPEGs (15–20 MB) exceeded Instagram's 8 MB carousel limit and Claude's API payload limit. Added `_compress_for_instagram()` (Pillow, resize ≤ 1440 px, re-encode JPEG to ≤ 7 MB). Upgraded tunnel probe from HEAD to GET with `facebookexternalhit` UA + Content-Type check to catch Cloudflare bot-challenge pages. Added JPEG/PNG-only filter for Instagram compatibility.
+
+33. **Check if everything is set up now.** — reviewed env, tunnel, and backend state.
+
+34. **Open `.env` file.**
+
+35. **Getting `[Errno 48] Address already in use` on restarting backend.** — killed the stale uvicorn process with `lsof -ti :8000 | xargs kill -9`.
+
+36. **Do I have to keep the backend running for scheduled posts?** — created `~/Library/LaunchAgents/com.autoinstapost.backend.plist` so the backend auto-starts on login and restarts automatically if it crashes.
+
+37. **How much will it cost to use Claude for captions?** — analysed token usage (~$0.01–0.05 per post with Claude Sonnet).
+
+38. **Is there any free LLM I can use instead?** — identified Google Gemini 2.5 Flash as a free alternative.
+
+39. **Switch to Gemini. I have API keys.** — rewrote `claude_service.py` to use Gemini 2.5 Flash as the primary caption model with Claude Sonnet as an automatic fallback; added `google-genai` to `requirements.txt`.
+
+40. **Done** *(after adding Gemini key to `.env`)* — restarted backend and tested end-to-end caption generation.
+
+41. **Restart the backend / test again.** *(multiple rounds with new Gemini API keys)* — resolved quota issues (`limit: 0`) by getting a new key from AI Studio; discovered `gemini-2.0-flash-lite` deprecated for new keys, switched to `gemini-2.5-flash`.
+
+---
+
+## Session 4 — Smart Captions, Location & Grouping
+
+42. **Rename the button to "Generate Caption Via AI" in Manual Tab. For schedule post always use Gemini to create captions.** — renamed button in `CaptionEditor.jsx`; removed default-caption fallback from `run_scheduled_job` so a Gemini failure skips the post rather than publishing placeholder text.
+
+43. **While posting, pick a date from photos and make it part of caption. Also identify location from photo and add location while posting photos on Instagram.** — added `extract_photo_metadata()` (EXIF date + GPS via Pillow); `_reverse_geocode()` (Nominatim, no API key); `search_instagram_location()` (Facebook Places API → `location_id` attached to every Instagram container); date/location context passed to Gemini prompt; `location_id` wired through all posting paths (scheduled, approved, manual).
+
+44. **Format to put date in caption should be like calendar icon and then date fetched from photo.** — removed date from Gemini prompt; added `_split_hashtags()` to parse caption body vs. hashtag block; date appended in code as `📅 DD Month YYYY` between body and hashtags; EXIF fallback chain: `DateTimeOriginal → DateTimeDigitized → DateTime`.
+
+45. **Also do same while generating caption in manual tab.** — confirmed the `/caption/generate` endpoint already uses the same `generate_caption()` path, so the `📅` date was already present; no extra changes needed.
+
+46. **Place date before hashtags. Use hashtags that are relevant and can increase the reach. Also add these two things in AGENTS.md.** — implemented `_split_hashtags()` to insert `📅` between caption body and hashtags; updated prompt rule to request 5–8 hashtags mixing broad high-volume tags with niche-specific ones; added AGENTS.md rules 4 (date format) and 5 (hashtag reach strategy).
+
+47. **In the manual tab also show location found by system on UI.** — `/caption/generate` now returns `location_name` alongside the caption; `App.jsx` stores it in `detectedLocation` state and renders a `📍 City, State` blue pill below the caption editor after generation.
+
+48. **Also post photos of same location in a single post. Add this as a guardrail in AGENTS.md.** — added `download_photo_header()` to `drive_service.py` (downloads first 128 KB only, sufficient for EXIF GPS without pulling the full 15–20 MB file); added `resolve_photo_locations()` (cache-first, partial downloads for uncached), `select_by_location()` (groups by location name, picks largest group ≥ 2 photos, falls back to random), and a persistent `data/photo_locations.json` cache; `run_scheduled_job` now resolves locations for all unused photos before selecting, posts up to 10 same-location photos per carousel; added AGENTS.md rule 6.
+
+49. **Commit and push. Update chronicle and readme file.** ← *you are here*

@@ -78,3 +78,17 @@ def download_photo(file_id: str) -> tuple[bytes, str]:
     while not done:
         _, done = downloader.next_chunk()
     return buffer.getvalue(), mime_type
+
+
+def download_photo_header(file_id: str, size: int = 131072) -> bytes:
+    """
+    Download only the first *size* bytes of a photo (default 128 KB).
+    JPEG EXIF data sits within the first ~64 KB, so this is sufficient for
+    location/date extraction without pulling the full 15–20 MB raw file.
+    """
+    service = _build_service()
+    request = service.files().get_media(fileId=file_id)
+    buffer = io.BytesIO()
+    downloader = MediaIoBaseDownload(buffer, request, chunksize=size)
+    downloader.next_chunk()   # one chunk = first `size` bytes, then stop
+    return buffer.getvalue()

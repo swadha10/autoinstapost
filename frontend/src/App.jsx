@@ -124,6 +124,7 @@ export default function App() {
   const [tone, setTone] = useState("engaging");
   const [generatingCaption, setGeneratingCaption] = useState(false);
   const [captionError, setCaptionError] = useState("");
+  const [detectedLocation, setDetectedLocation] = useState("");
 
   const [posting, setPosting] = useState(false);
   const [posted, setPosted] = useState(false);
@@ -199,6 +200,7 @@ export default function App() {
       return [...prev, photo.id];
     });
     setCaption("");
+    setDetectedLocation("");
   }
 
   async function handleGenerateCaption() {
@@ -208,6 +210,7 @@ export default function App() {
     try {
       const data = await generateCaption(selectedIds, tone);
       setCaption(data.caption);
+      setDetectedLocation(data.location_name || "");
     } catch (e) {
       setCaptionError(e.message);
     } finally {
@@ -324,6 +327,17 @@ export default function App() {
                   onGenerate={handleGenerateCaption}
                   loading={generatingCaption}
                 />
+                {detectedLocation && (
+                  <div style={{
+                    display: "inline-flex", alignItems: "center", gap: "6px",
+                    marginTop: "10px", padding: "5px 12px",
+                    background: "#f0f7ff", border: "1px solid #c5dcf5",
+                    borderRadius: "20px", fontSize: "13px", color: "#2a6db5",
+                  }}>
+                    <span>📍</span>
+                    <span>{detectedLocation}</span>
+                  </div>
+                )}
                 {captionError && (
                   <div style={styles.error}>
                     {captionError}

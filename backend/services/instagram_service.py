@@ -165,15 +165,46 @@ def _account_id() -> str:
 # Core posting functions
 # ---------------------------------------------------------------------------
 
-def create_container(image_url: str, caption: str) -> str:
+def search_instagram_location(lat: float, lng: float):
+    """
+    Search Facebook Places near GPS coordinates and return the closest place's ID,
+    or None if not found. The ID can be attached to an Instagram post as location_id.
+    """
+    try:
+        resp = httpx.get(
+            f"{GRAPH_BASE}/search",
+            params={
+                "type": "place",
+                "center": f"{lat},{lng}",
+                "distance": 1000,
+                "fields": "id,name",
+                "limit": 1,
+                "access_token": get_valid_token(),
+            },
+            timeout=15,
+        )
+        if resp.is_success:
+            data = resp.json().get("data", [])
+            if data:
+                logger.info("Found Instagram place: %s (id=%s)", data[0]["name"], data[0]["id"])
+                return data[0]["id"]
+    except Exception as e:
+        logger.warning("Instagram location search failed: %s", e)
+    return None
+
+
+def create_container(image_url: str, caption: str, location_id=None) -> str:
     account_id = _account_id()
+    params = {
+        "image_url": image_url,
+        "caption": caption,
+        "access_token": get_valid_token(),
+    }
+    if location_id:
+        params["location_id"] = location_id
     resp = httpx.post(
         f"{GRAPH_BASE}/{account_id}/media",
-        params={
-            "image_url": image_url,
-            "caption": caption,
-            "access_token": get_valid_token(),
-        },
+        params=params,
         timeout=30,
     )
     if not resp.is_success:
@@ -225,9 +256,9 @@ def publish_container(container_id: str) -> str:
     return data["id"]
 
 
-def post_photo(image_url: str, caption: str) -> str:
+def post_photo(image_url: str, caption: str, location_id=None) -> str:
     """Convenience: create container, wait until ready, then publish. Returns published media ID."""
-    container_id = create_container(image_url, caption)
+    container_id = create_container(image_url, caption, location_id)
     wait_for_container(container_id)
     return publish_container(container_id)
 
@@ -252,17 +283,20 @@ def create_carousel_item_container(image_url: str) -> str:
     return data["id"]
 
 
-def create_carousel_container(item_ids: list[str], caption: str) -> str:
+def create_carousel_container(item_ids: list[str], caption: str, location_id=None) -> str:
     """Create the carousel wrapper container from individual item container IDs."""
     account_id = _account_id()
+    params = {
+        "media_type": "CAROUSEL",
+        "caption": caption,
+        "children": ",".join(item_ids),
+        "access_token": get_valid_token(),
+    }
+    if location_id:
+        params["location_id"] = location_id
     resp = httpx.post(
         f"{GRAPH_BASE}/{account_id}/media",
-        params={
-            "media_type": "CAROUSEL",
-            "caption": caption,
-            "children": ",".join(item_ids),
-            "access_token": get_valid_token(),
-        },
+        params=params,
         timeout=30,
     )
     if not resp.is_success:
@@ -273,7 +307,7 @@ def create_carousel_container(item_ids: list[str], caption: str) -> str:
     return data["id"]
 
 
-def post_carousel(image_urls: list[str], caption: str) -> str:
+def post_carousel(image_urls: list[str], caption: str, location_id=None) -> str:
     """
     Post multiple images as an Instagram carousel.
     Returns the published media ID.
@@ -288,7 +322,7 @@ def post_carousel(image_urls: list[str], caption: str) -> str:
         wait_for_container(item_id)
         item_ids.append(item_id)
 
-    # Step 2: create carousel container, wait, then publish
-    carousel_id = create_carousel_container(item_ids, caption)
+    # Step 2: create carousel container with location, wait, then publish
+    carousel_id = create_carousel_container(item_ids, caption, location_id)
     wait_for_container(carousel_id)
     return publish_container(carousel_id)

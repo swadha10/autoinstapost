@@ -53,7 +53,7 @@ export default function CaptionEditor({ caption, tone, onChange, onToneChange, o
       </div>
 
       <button style={styles.generateBtn(loading)} onClick={onGenerate} disabled={loading}>
-        {loading ? "Generating..." : "Generate with Claude AI"}
+        {loading ? "Generating..." : "Generate Caption Via AI"}
       </button>
 
       <label style={styles.label}>Caption</label>

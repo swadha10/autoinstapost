@@ -34,3 +34,25 @@ The goal is for captions to read like something a real person dashed off — not
 - Each scheduled post must include a minimum of 3 photos, posted as a carousel.
 - If fewer than 3 unposted photos remain in the folder, use however many are available rather than skipping the post entirely.
 - Never post a single photo from the scheduler — the experience should always feel like a curated set.
+
+## 4. Always Include the Photo Date
+
+- Extract the date from the photo's EXIF metadata (DateTimeOriginal → DateTimeDigitized → DateTime, in priority order).
+- Append the date to the caption in the format `📅 DD Month YYYY` (e.g. `📅 26 January 2026`).
+- The date must appear **after** the caption body and **before** the hashtags.
+- If no EXIF date is found, omit the date line entirely — do not guess or fabricate a date.
+
+## 6. Group Photos by Location — Never Mix Locations in One Post
+
+- Before selecting photos for a scheduled post, resolve the GPS location of every unposted photo using EXIF metadata (partial 128 KB download + persistent cache to avoid re-fetching).
+- Group photos by location name. Select **all photos from the location with the most unposted shots** for the post (up to the Instagram carousel maximum of 10).
+- Never mix photos taken at clearly different locations in a single post.
+- If no photo has GPS data, or no location group has ≥ 2 photos, fall back to random selection so the scheduler always makes progress.
+- Cache resolved locations in `data/photo_locations.json` (keyed by Drive file ID) so each photo is only scanned for GPS once.
+
+## 5. Hashtags Must Maximise Reach
+
+- Every post must include 5 to 8 hashtags, placed as the last element after the `📅` date line.
+- Mix **broad high-volume tags** (e.g. `#photography`, `#nature`, `#travel`) with **specific niche tags** (e.g. `#coloradowinter`, `#sonyalpha`, `#snowymountains`) to balance discovery and relevance.
+- All hashtags must be lowercase and directly relevant to the photo's subject, location, and mood.
+- Never use generic filler tags like `#instagood`, `#photooftheday`, or `#like4like`.

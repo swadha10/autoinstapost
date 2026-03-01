@@ -107,3 +107,9 @@ export async function getScheduleStatus() {
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
+
+export async function runScheduleNow() {
+  const res = await fetch(`${BASE}/schedule/run-now`, { method: "POST" });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}

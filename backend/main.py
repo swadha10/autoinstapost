@@ -1,10 +1,17 @@
 """AutoInstaPost — FastAPI backend entry point."""
 
+import logging
+import os
 from pathlib import Path
 
 from dotenv import load_dotenv
 
 load_dotenv()
+
+logging.basicConfig(level=logging.INFO)
+_log = logging.getLogger(__name__)
+_pub = os.environ.get("PUBLIC_BASE_URL", "")
+_log.info("PUBLIC_BASE_URL loaded: %s", _pub if _pub else "(NOT SET)")
 
 from contextlib import asynccontextmanager
 

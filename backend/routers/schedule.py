@@ -117,6 +117,15 @@ def get_history():
     return load_history()
 
 
+@router.post("/run-now")
+def run_now():
+    """Trigger the scheduled job immediately for testing."""
+    from services.schedule_service import run_scheduled_job
+    import threading
+    threading.Thread(target=run_scheduled_job, daemon=True).start()
+    return {"success": True, "message": "Job triggered — check History tab in ~30s"}
+
+
 @router.get("/status")
 def get_status(request: Request):
     """Return next scheduled run time + pre-flight validation checks."""
