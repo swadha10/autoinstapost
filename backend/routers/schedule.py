@@ -147,12 +147,14 @@ def get_status(request: Request):
     })
 
     # 3. Fresh photos available
+    upcoming_pool = []
     if folder_id:
         try:
             from services.drive_service import list_photos
             photos = list_photos(folder_id)
             posted = load_posted_ids()
             fresh = [p for p in photos if p["id"] not in posted]
+            upcoming_pool = [{"id": p["id"], "name": p.get("name", "")} for p in fresh]
             checks.append({
                 "name": "Fresh photos",
                 "ok": len(fresh) > 0,
@@ -207,7 +209,7 @@ def get_status(request: Request):
         checks.append({"name": "Instagram token", "ok": False, "message": str(e)})
 
     all_ok = all(c["ok"] for c in checks)
-    return {"next_run": next_run, "checks": checks, "all_ok": all_ok}
+    return {"next_run": next_run, "checks": checks, "all_ok": all_ok, "upcoming_pool": upcoming_pool}
 
 
 # ---------------------------------------------------------------------------

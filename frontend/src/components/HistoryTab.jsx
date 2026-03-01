@@ -183,32 +183,57 @@ export default function HistoryTab() {
             borderRadius: "10px",
             padding: "14px 16px",
             marginBottom: "16px",
-            display: "flex",
-            alignItems: "center",
-            gap: "12px",
           }}>
-            <span style={{ fontSize: "24px" }}>{nextRun ? (status.all_ok ? "🕐" : "⚠️") : "💤"}</span>
-            <div>
-              {nextRun ? (
-                <>
-                  <div style={{ fontSize: "14px", fontWeight: 700, color: "#111" }}>
-                    Next post {nextRun.label}
-                  </div>
-                  {nextRun.sub && (
-                    <div style={{ fontSize: "12px", color: "#888", marginTop: "2px" }}>{nextRun.sub}</div>
-                  )}
-                  {!status.all_ok && (
-                    <div style={{ fontSize: "12px", color: "#a86000", marginTop: "4px" }}>
-                      Fix the issues below before the next run
+            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <span style={{ fontSize: "24px" }}>{nextRun ? (status.all_ok ? "🕐" : "⚠️") : "💤"}</span>
+              <div>
+                {nextRun ? (
+                  <>
+                    <div style={{ fontSize: "14px", fontWeight: 700, color: "#111" }}>
+                      Next post {nextRun.label}
                     </div>
-                  )}
-                </>
-              ) : (
-                <div style={{ fontSize: "14px", fontWeight: 600, color: "#888" }}>
-                  No scheduled post — enable auto-schedule in the Schedule tab
-                </div>
-              )}
+                    {nextRun.sub && (
+                      <div style={{ fontSize: "12px", color: "#888", marginTop: "2px" }}>{nextRun.sub}</div>
+                    )}
+                    {!status.all_ok && (
+                      <div style={{ fontSize: "12px", color: "#a86000", marginTop: "4px" }}>
+                        Fix the issues below before the next run
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div style={{ fontSize: "14px", fontWeight: 600, color: "#888" }}>
+                    No scheduled post — enable auto-schedule in the Schedule tab
+                  </div>
+                )}
+              </div>
             </div>
+
+            {/* Upcoming photo pool */}
+            {nextRun && status.upcoming_pool?.length > 0 && (
+              <div style={{ marginTop: "12px" }}>
+                <div style={{ fontSize: "11px", fontWeight: 600, color: "#888", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                  Will randomly pick 3 from {status.upcoming_pool.length} available
+                </div>
+                <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                  {status.upcoming_pool.map((photo) => (
+                    <div key={photo.id} style={{ position: "relative" }}>
+                      <img
+                        src={photoRawUrl(photo.id)}
+                        alt={photo.name}
+                        title={photo.name}
+                        style={{
+                          width: "52px", height: "52px",
+                          objectFit: "cover", borderRadius: "6px",
+                          background: "#e0e0e0",
+                        }}
+                        onError={(e) => { e.target.style.background = "#e0e0e0"; e.target.style.display = "none"; }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

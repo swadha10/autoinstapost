@@ -28,3 +28,9 @@ The goal is for captions to read like something a real person dashed off — not
 - Use words like "vibrant", "stunning", "breathtaking", "magical", "journey", "adventure" unless the photo genuinely calls for it
 - End with a call-to-action ("Let me know in the comments!", "Tag a friend who…")
 - Stack more than 6 hashtags
+
+## 3. Always Pick at Least 3 Photos
+
+- Each scheduled post must include a minimum of 3 photos, posted as a carousel.
+- If fewer than 3 unposted photos remain in the folder, use however many are available rather than skipping the post entirely.
+- Never post a single photo from the scheduler — the experience should always feel like a curated set.

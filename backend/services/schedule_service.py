@@ -122,23 +122,30 @@ def log_post_attempt(
     HISTORY_FILE.write_text(json.dumps(history, indent=2))
 
 
-def _post_image(file_id: str, caption: str) -> str:
-    """Download from Drive, save temp file, post to Instagram. Returns media_id."""
-    image_bytes, mime_type = download_photo(file_id)
-    ext = mime_type.split("/")[-1].replace("jpeg", "jpg")
-    filename = f"{uuid.uuid4().hex}.{ext}"
-    filepath = TEMP_DIR / filename
-    filepath.write_bytes(image_bytes)
+def _post_images(file_ids: list[str], caption: str) -> str:
+    """Download one or more Drive photos, post single or carousel. Returns media_id."""
+    from services.instagram_service import post_carousel
 
     base_url = os.environ.get("PUBLIC_BASE_URL", "http://localhost:8000").rstrip("/")
-    image_url = f"{base_url}/temp/{filename}"
+    temp_files: list[Path] = []
+    image_urls: list[str] = []
 
     try:
-        media_id = post_photo(image_url, caption)
-    finally:
-        filepath.unlink(missing_ok=True)
+        for fid in file_ids:
+            image_bytes, mime_type = download_photo(fid)
+            ext = mime_type.split("/")[-1].replace("jpeg", "jpg")
+            filename = f"{uuid.uuid4().hex}.{ext}"
+            filepath = TEMP_DIR / filename
+            filepath.write_bytes(image_bytes)
+            temp_files.append(filepath)
+            image_urls.append(f"{base_url}/temp/{filename}")
 
-    return media_id
+        if len(image_urls) == 1:
+            return post_photo(image_urls[0], caption)
+        return post_carousel(image_urls, caption)
+    finally:
+        for fp in temp_files:
+            fp.unlink(missing_ok=True)
 
 
 def run_scheduled_job() -> None:
@@ -170,14 +177,19 @@ def run_scheduled_job() -> None:
         logger.warning("Scheduler: all %d photos have already been posted — skipping to avoid reuse.", len(photos))
         return
 
-    photo = random.choice(unused)
-    file_id = photo["id"]
-    file_name = photo.get("name", file_id)
+    # Guardrail (AGENTS.md #3): always pick at least 3 photos for a carousel
+    pick_count = min(3, len(unused))
+    selected = random.sample(unused, pick_count)
+    file_ids = [p["id"] for p in selected]
+    file_names = [p.get("name", p["id"]) for p in selected]
     tone = config.get("tone", "engaging")
 
     try:
-        image_bytes, mime_type = download_photo(file_id)
-        caption = generate_caption([(image_bytes, mime_type)], tone=tone)
+        images = []
+        for fid in file_ids:
+            image_bytes, mime_type = download_photo(fid)
+            images.append((image_bytes, mime_type))
+        caption = generate_caption(images, tone=tone)
     except Exception as e:
         logger.error("Scheduler: failed to generate caption — %s", e)
         fallback = config.get("default_caption", "").strip()
@@ -189,17 +201,18 @@ def run_scheduled_job() -> None:
 
     if not config.get("require_approval", True):
         try:
-            media_id = _post_image(file_id, caption)
-            record_posted_id(file_id)
+            media_id = _post_images(file_ids, caption)
+            for fid in file_ids:
+                record_posted_id(fid)
             log_post_attempt(
-                file_ids=[file_id], file_names=[file_name],
+                file_ids=file_ids, file_names=file_names,
                 caption=caption, status="success",
                 source="scheduled", media_id=media_id,
             )
-            logger.info("Scheduler: auto-posted %s", file_name)
+            logger.info("Scheduler: auto-posted %d photo(s): %s", len(file_ids), file_names)
         except Exception as e:
             log_post_attempt(
-                file_ids=[file_id], file_names=[file_name],
+                file_ids=file_ids, file_names=file_names,
                 caption=caption, status="failed",
                 source="scheduled", error=str(e),
             )
@@ -207,17 +220,18 @@ def run_scheduled_job() -> None:
     else:
         post = {
             "id": str(uuid.uuid4()),
-            "file_id": file_id,
-            "file_name": file_name,
+            "file_ids": file_ids,
+            "file_names": file_names,
             "caption": caption,
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
         pending = load_pending()
         pending.append(post)
         save_pending(pending)
-        # Record as used now so the same photo isn't queued again before approval
-        record_posted_id(file_id)
-        logger.info("Scheduler: queued %s for approval (id=%s)", file_name, post["id"])
+        # Record as used now so the same photos aren't queued again before approval
+        for fid in file_ids:
+            record_posted_id(fid)
+        logger.info("Scheduler: queued %d photo(s) for approval (id=%s)", len(file_ids), post["id"])
 
 
 def approve_pending_post(post_id: str) -> bool:
@@ -227,16 +241,20 @@ def approve_pending_post(post_id: str) -> bool:
     if post is None:
         return False
 
+    # Support both old single-photo format (file_id) and new multi-photo format (file_ids)
+    file_ids = post.get("file_ids") or [post["file_id"]]
+    file_names = post.get("file_names") or [post.get("file_name", file_ids[0])]
+
     try:
-        media_id = _post_image(post["file_id"], post["caption"])
+        media_id = _post_images(file_ids, post["caption"])
         log_post_attempt(
-            file_ids=[post["file_id"]], file_names=[post.get("file_name", post["file_id"])],
+            file_ids=file_ids, file_names=file_names,
             caption=post["caption"], status="success",
             source="approved", media_id=media_id,
         )
     except Exception as e:
         log_post_attempt(
-            file_ids=[post["file_id"]], file_names=[post.get("file_name", post["file_id"])],
+            file_ids=file_ids, file_names=file_names,
             caption=post["caption"], status="failed",
             source="approved", error=str(e),
         )
