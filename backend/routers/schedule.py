@@ -179,12 +179,15 @@ def get_status(request: Request):
         ts = get_token_status()
         token_ok = ts.get("valid", False)
         days = ts.get("days_left")
-        if token_ok and days is not None:
+        status_str = ts.get("status", "")
+        if status_str == "unknown":
+            msg = "Valid (expiry unknown — will be tracked after next use)"
+        elif token_ok and days is not None:
             msg = f"Valid — {days} day{'s' if days != 1 else ''} left"
         elif token_ok:
             msg = "Valid"
         else:
-            msg = "Invalid or expired — exchange a new token in the Manual tab"
+            msg = "Expired — exchange a new token in the Manual tab"
         checks.append({"name": "Instagram token", "ok": token_ok, "message": msg})
     except Exception as e:
         checks.append({"name": "Instagram token", "ok": False, "message": str(e)})

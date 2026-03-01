@@ -113,8 +113,10 @@ def refresh_long_lived_token(current_token: str) -> str:
 
 def get_valid_token() -> str:
     """
-    Return a valid access token, refreshing automatically if it's within
-    REFRESH_THRESHOLD_DAYS of expiry.
+    Return a valid access token, refreshing automatically when:
+    - fewer than REFRESH_THRESHOLD_DAYS remain on the token, OR
+    - expires_at is 0 (token loaded from env var, expiry unknown) — refresh
+      to bootstrap proper expiry tracking.
     """
     data = _load_token_data()
     token = data.get("access_token", "")
@@ -123,10 +125,11 @@ def get_valid_token() -> str:
     threshold = REFRESH_THRESHOLD_DAYS * 86400
     time_left = expires_at - time.time()
 
-    if expires_at > 0 and time_left < threshold:
-        logger.info(
-            "Instagram token expires in %.1f days — refreshing now.", time_left / 86400
-        )
+    needs_refresh = (expires_at == 0) or (expires_at > 0 and time_left < threshold)
+
+    if needs_refresh:
+        reason = "expiry unknown (bootstrapping)" if expires_at == 0 else f"expires in {time_left / 86400:.1f} days"
+        logger.info("Instagram token — %s — refreshing now.", reason)
         try:
             token = refresh_long_lived_token(token)
         except Exception as e:
@@ -140,9 +143,10 @@ def get_token_status() -> dict:
     data = _load_token_data()
     expires_at = data.get("expires_at", 0)
     if expires_at == 0:
-        return {"status": "unknown", "expires_at": None, "days_left": None}
+        return {"valid": True, "status": "unknown", "expires_at": None, "days_left": None}
     days_left = (expires_at - time.time()) / 86400
     return {
+        "valid": days_left > 0,
         "status": "ok" if days_left > 0 else "expired",
         "expires_at": expires_at,
         "days_left": round(days_left, 1),
