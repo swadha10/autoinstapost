@@ -164,14 +164,28 @@ def get_status(request: Request):
     else:
         checks.append({"name": "Fresh photos", "ok": False, "message": "Set a folder first"})
 
-    # 4. Public URL reachable by Instagram
+    # 4. Public URL reachable by Instagram — actually probe it, don't just check the string
+    import httpx as _httpx
     public_url = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
-    url_ok = bool(public_url) and "localhost" not in public_url and "127.0.0.1" not in public_url
-    checks.append({
-        "name": "Public image URL",
-        "ok": url_ok,
-        "message": public_url if url_ok else "PUBLIC_BASE_URL not set or points to localhost — Instagram can't fetch images",
-    })
+    looks_public = bool(public_url) and "localhost" not in public_url and "127.0.0.1" not in public_url
+    if not looks_public:
+        checks.append({
+            "name": "Public image URL",
+            "ok": False,
+            "message": "PUBLIC_BASE_URL not set or points to localhost — Instagram can't fetch images",
+        })
+    else:
+        try:
+            probe = _httpx.get(f"{public_url}/health", timeout=6, follow_redirects=True)
+            reachable = probe.is_success
+        except Exception:
+            reachable = False
+        checks.append({
+            "name": "Public image URL",
+            "ok": reachable,
+            "message": public_url if reachable
+                       else f"Tunnel unreachable ({public_url}) — restart Cloudflare and update PUBLIC_BASE_URL in .env",
+        })
 
     # 5. Instagram token valid
     try:

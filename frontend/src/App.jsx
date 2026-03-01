@@ -139,7 +139,13 @@ export default function App() {
       loadPhotos(stored.id);
     }
     getScheduleConfig()
-      .then((cfg) => setDefaultCaption(cfg.default_caption || ""))
+      .then((cfg) => {
+        setDefaultCaption(cfg.default_caption || "");
+        // First-time load: no localStorage entry but schedule config has a folder
+        if (!stored?.id && cfg.folder_id) {
+          loadPhotos(cfg.folder_id);
+        }
+      })
       .catch(() => {});
   }, []);
 
