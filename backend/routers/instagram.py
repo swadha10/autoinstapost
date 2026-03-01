@@ -37,7 +37,15 @@ def _save_temp(image_bytes: bytes, mime_type: str) -> tuple[Path, str]:
     filename = f"{uuid.uuid4().hex}.{ext}"
     filepath = TEMP_DIR / filename
     filepath.write_bytes(image_bytes)
-    base_url = os.environ.get("PUBLIC_BASE_URL", "http://localhost:8000").rstrip("/")
+    base_url = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
+    if not base_url or "localhost" in base_url or "127.0.0.1" in base_url:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"PUBLIC_BASE_URL is not set to a public URL (current: '{base_url}'). "
+                "Run cloudflared, update PUBLIC_BASE_URL in backend/.env, then restart the backend."
+            ),
+        )
     return filepath, f"{base_url}/temp/{filename}"
 
 

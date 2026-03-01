@@ -124,9 +124,19 @@ def log_post_attempt(
 
 def _post_images(file_ids: list[str], caption: str) -> str:
     """Download one or more Drive photos, post single or carousel. Returns media_id."""
+    import httpx as _httpx
     from services.instagram_service import post_carousel
 
-    base_url = os.environ.get("PUBLIC_BASE_URL", "http://localhost:8000").rstrip("/")
+    base_url = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
+
+    # Fail early with a clear message rather than letting Instagram return a cryptic error
+    if not base_url or "localhost" in base_url or "127.0.0.1" in base_url:
+        raise RuntimeError(
+            f"PUBLIC_BASE_URL is not set to a public URL (current value: '{base_url}'). "
+            "Run 'cloudflared tunnel --url http://localhost:8000', copy the URL, "
+            "update PUBLIC_BASE_URL in backend/.env, then restart the backend."
+        )
+
     temp_files: list[Path] = []
     image_urls: list[str] = []
 
@@ -139,6 +149,21 @@ def _post_images(file_ids: list[str], caption: str) -> str:
             filepath.write_bytes(image_bytes)
             temp_files.append(filepath)
             image_urls.append(f"{base_url}/temp/{filename}")
+
+        # Probe first URL to catch a dead tunnel before hitting Instagram
+        try:
+            probe = _httpx.head(image_urls[0], timeout=6, follow_redirects=True)
+            if not probe.is_success:
+                raise RuntimeError(
+                    f"Tunnel is up but image URL returned {probe.status_code}: {image_urls[0]}"
+                )
+        except _httpx.RequestError as exc:
+            raise RuntimeError(
+                f"Cloudflare tunnel appears to be down — image URL unreachable: {exc}. "
+                "Restart cloudflared, update PUBLIC_BASE_URL in .env, then restart the backend."
+            ) from exc
+
+        logger.info("Posting to Instagram: %s", image_urls)
 
         if len(image_urls) == 1:
             return post_photo(image_urls[0], caption)
