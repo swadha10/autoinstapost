@@ -65,12 +65,14 @@ def _save_token_data(
 
 def _get_app_credentials(creds: dict | None) -> tuple[str, str]:
     """Return (app_id, app_secret) from creds or env."""
-    if creds:
-        app_id = creds.get("facebook_app_id") or os.environ.get("FACEBOOK_APP_ID", "")
-        app_secret = creds.get("facebook_app_secret") or os.environ.get("FACEBOOK_APP_SECRET", "")
-    else:
-        app_id = os.environ["FACEBOOK_APP_ID"]
-        app_secret = os.environ["FACEBOOK_APP_SECRET"]
+    if creds is not None:
+        app_id = creds.get("facebook_app_id", "")
+        app_secret = creds.get("facebook_app_secret", "")
+        if not app_id or not app_secret:
+            raise ValueError("Facebook App ID and Secret not configured. Go to Setup and connect Instagram.")
+        return app_id, app_secret
+    app_id = os.environ["FACEBOOK_APP_ID"]
+    app_secret = os.environ["FACEBOOK_APP_SECRET"]
     return app_id, app_secret
 
 
