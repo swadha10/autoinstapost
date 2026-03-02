@@ -118,7 +118,7 @@ def instagram_connect(current_user: dict = Depends(get_current_user)):
 
     state = create_state_token(current_user["id"])
     redirect_uri = f"{public_url}/auth/instagram/callback"
-    scope = "instagram_basic,instagram_content_publish,pages_show_list,pages_read_engagement"
+    scope = "instagram_basic,instagram_content_publish"
     url = (
         f"https://www.facebook.com/dialog/oauth"
         f"?client_id={app_id}"
