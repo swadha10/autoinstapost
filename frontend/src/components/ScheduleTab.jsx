@@ -6,11 +6,28 @@ import {
   getServerTimezone,
   rejectPost,
   saveScheduleConfig,
+  startGooglePicker,
 } from "../api/client";
 import { photoRawUrl } from "../api/client";
+import FolderPicker from "./FolderPicker";
+import { useAuth } from "../context/AuthContext";
 
 const TONES = ["engaging", "professional", "funny", "inspirational", "minimal"];
 const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+const TIMEZONES = [
+  { label: "Pacific Time (PST/PDT)",    value: "America/Los_Angeles" },
+  { label: "Mountain Time (MST/MDT)",   value: "America/Denver" },
+  { label: "Central Time (CST/CDT)",    value: "America/Chicago" },
+  { label: "Eastern Time (EST/EDT)",    value: "America/New_York" },
+  { label: "London (GMT/BST)",          value: "Europe/London" },
+  { label: "Central Europe (CET/CEST)", value: "Europe/Berlin" },
+  { label: "India (IST)",               value: "Asia/Kolkata" },
+  { label: "China (CST)",               value: "Asia/Shanghai" },
+  { label: "Japan (JST)",               value: "Asia/Tokyo" },
+  { label: "Australia/Sydney (AEST)",   value: "Australia/Sydney" },
+  { label: "UTC",                       value: "UTC" },
+];
 
 const s = {
   card: {
@@ -147,23 +164,17 @@ const s = {
     fontWeight: 600,
   },
   emptyNote: { color: "#999", fontSize: "14px", padding: "12px 0" },
-  folderInput: {
-    padding: "8px 12px",
-    border: "1px solid #ddd",
-    borderRadius: "8px",
-    fontSize: "14px",
-    outline: "none",
-    flex: 1,
-    minWidth: "220px",
-  },
 };
 
-export default function ScheduleTab({ savedFolder }) {
+export default function ScheduleTab() {
+  const { user } = useAuth();
   const [config, setConfig] = useState(null);
   const [tzInfo, setTzInfo] = useState(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [pickerLoading, setPickerLoading] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const [pending, setPending] = useState([]);
   const [actioning, setActioning] = useState({});
@@ -171,12 +182,7 @@ export default function ScheduleTab({ savedFolder }) {
 
   // Load config and timezone on mount
   useEffect(() => {
-    getScheduleConfig()
-      .then((cfg) => {
-        if (!cfg.folder_id && savedFolder?.id) cfg.folder_id = savedFolder.id;
-        setConfig(cfg);
-      })
-      .catch(() => {});
+    getScheduleConfig().then(setConfig).catch(() => {});
     getServerTimezone().then(setTzInfo).catch(() => {});
   }, []);
 
@@ -207,6 +213,19 @@ export default function ScheduleTab({ savedFolder }) {
     const current = config.weekdays ?? [];
     const next = current.includes(day) ? current.filter((d) => d !== day) : [...current, day].sort((a, b) => a - b);
     update("weekdays", next);
+  }
+
+  async function handlePickFromGoogle() {
+    setPickerLoading(true);
+    try {
+      const data = await startGooglePicker();
+      window.open(data.pickerUri, "_blank");
+      setPickerOpen(true);
+    } catch (e) {
+      alert("Failed to open picker: " + e.message);
+    } finally {
+      setPickerLoading(false);
+    }
   }
 
   async function handleSave() {
@@ -297,15 +316,15 @@ export default function ScheduleTab({ savedFolder }) {
               </>
             );
           })()}
-          {tzInfo && (
-            <span style={{
-              fontSize: "12px", color: "#888", background: "#f5f5f5",
-              border: "1px solid #e0e0e0", borderRadius: "6px",
-              padding: "4px 10px", whiteSpace: "nowrap",
-            }}>
-              🌐 {tzInfo.timezone} (UTC{tzInfo.utc_offset})
-            </span>
-          )}
+          <select
+            style={{ ...s.select, fontSize: "13px" }}
+            value={config.timezone || "America/Los_Angeles"}
+            onChange={(e) => update("timezone", e.target.value)}
+          >
+            {TIMEZONES.map((tz) => (
+              <option key={tz.value} value={tz.value}>{tz.label}</option>
+            ))}
+          </select>
         </div>
 
         {/* Cadence */}
@@ -347,23 +366,60 @@ export default function ScheduleTab({ savedFolder }) {
           </div>
         )}
 
-        {/* Folder ID */}
+        {/* Photo source toggle */}
         <div style={s.row}>
-          <span style={s.label}>Drive folder</span>
-          {savedFolder?.name && config.folder_id === savedFolder.id ? (
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", background: "#f0f0ff", border: "1px solid #c7c7ff", borderRadius: "8px", padding: "8px 14px" }}>
-              <span>📁</span>
-              <span style={{ fontWeight: 600, fontSize: "14px", color: "#333" }}>{savedFolder.name}</span>
-            </div>
-          ) : (
-            <input
-              style={s.folderInput}
-              placeholder="Paste Google Drive folder ID…"
-              value={config.folder_id}
-              onChange={(e) => update("folder_id", e.target.value)}
-            />
-          )}
+          <span style={s.label}>Photo source</span>
+          <button
+            style={s.toggle(config.source !== "gphotos_picker")}
+            onClick={() => update("source", "drive")}
+          >
+            Google Drive
+          </button>
+          <button
+            style={s.toggle(config.source === "gphotos_picker")}
+            onClick={() => update("source", "gphotos_picker")}
+          >
+            Google Photos
+          </button>
         </div>
+
+        {/* Folder or Picker */}
+        {config.source === "gphotos_picker" ? (
+          <div style={{ marginBottom: "14px" }}>
+            <span style={{ ...s.label, display: "block", marginBottom: "8px" }}>Google Photos selection</span>
+            <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
+              <button
+                style={{
+                  padding: "8px 18px", borderRadius: "8px", border: "none",
+                  background: "#4285f4", color: "#fff", fontWeight: 600, fontSize: "13px",
+                  cursor: pickerLoading ? "not-allowed" : "pointer",
+                  opacity: pickerLoading ? 0.7 : 1,
+                }}
+                onClick={handlePickFromGoogle}
+                disabled={pickerLoading}
+              >
+                {pickerLoading ? "Opening…" : pickerOpen ? "Re-open Picker" : "Open Google Photos Picker"}
+              </button>
+              {pickerOpen && (
+                <span style={{ fontSize: "12px", color: "#1a7a40", fontWeight: 600 }}>
+                  ✓ Picker session active
+                </span>
+              )}
+            </div>
+            <div style={{ fontSize: "12px", color: "#888", marginTop: "6px" }}>
+              Select photos in the picker — the scheduler will post from that selection each run.
+            </div>
+          </div>
+        ) : (
+          <div style={{ marginBottom: "14px" }}>
+            <span style={{ ...s.label, display: "block", marginBottom: "8px" }}>Drive folder</span>
+            <FolderPicker
+              selectedId={config.folder_id}
+              onSelect={(id) => update("folder_id", id)}
+              userId={user?.id}
+            />
+          </div>
+        )}
 
         {/* Tone */}
         <div style={s.row}>

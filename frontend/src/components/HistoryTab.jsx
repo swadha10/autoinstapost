@@ -7,6 +7,12 @@ const SOURCE_LABEL = {
   approved: { text: "Approved", bg: "#fff3e0", color: "#a86a00" },
 };
 
+const STATUS_BADGE = {
+  success: { text: "✓ Success", bg: "#e6f9ee", color: "#1a7a40" },
+  failed:  { text: "✗ Failed",  bg: "#fff0f0", color: "#c00" },
+  queued:  { text: "⏳ Pending approval", bg: "#fff8e6", color: "#92600a" },
+};
+
 function formatNextRun(isoString) {
   if (!isoString) return null;
   const d = new Date(isoString);
@@ -31,9 +37,9 @@ const s = {
   card: {
     background: "#fff",
     borderRadius: "12px",
-    padding: "20px",
+    padding: "16px",
     boxShadow: "0 2px 12px #0001",
-    marginBottom: "20px",
+    marginBottom: "16px",
   },
   sectionTitle: { fontSize: "16px", fontWeight: 700, color: "#111" },
   row: {
@@ -290,6 +296,8 @@ export default function HistoryTab() {
           const firstId = entry.file_ids?.[0];
           const multiCount = (entry.file_ids?.length ?? 1) > 1 ? entry.file_ids.length : null;
 
+          const statusStyle = STATUS_BADGE[entry.status] ?? STATUS_BADGE.failed;
+
           return (
             <div key={entry.id} style={s.row}>
               {firstId ? (
@@ -321,7 +329,7 @@ export default function HistoryTab() {
 
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div>
-                  <span style={s.statusBadge(ok)}>{ok ? "✓ Success" : "✗ Failed"}</span>
+                  <span style={{ ...s.badge(statusStyle.bg, statusStyle.color) }}>{statusStyle.text}</span>
                   <span style={s.badge(src.bg, src.color)}>{src.text}</span>
                   {multiCount && (
                     <span style={s.badge("#f5f5f5", "#555")}>Carousel · {multiCount}</span>
@@ -330,11 +338,18 @@ export default function HistoryTab() {
 
                 {entry.caption && <div style={s.caption}>{entry.caption}</div>}
 
-                {!ok && entry.error && <div style={s.errorMsg}>{entry.error}</div>}
+                {entry.status === "failed" && entry.error && (
+                  <div style={s.errorMsg}>{entry.error}</div>
+                )}
+                {entry.status === "queued" && (
+                  <div style={{ fontSize: "12px", color: "#92600a", marginTop: "6px" }}>
+                    Waiting in Schedule → Pending Approvals
+                  </div>
+                )}
 
                 <div style={s.meta}>
                   {new Date(entry.created_at).toLocaleString()}
-                  {entry.media_id && (
+                  {entry.status === "success" && entry.media_id && (
                     <span style={{ marginLeft: "8px", color: "#bbb" }}>· id {entry.media_id}</span>
                   )}
                 </div>

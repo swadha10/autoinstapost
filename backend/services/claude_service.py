@@ -9,17 +9,23 @@ def generate_caption(
     tone: str = "engaging",
     date_str=None,
     location_str=None,
+    creds: dict | None = None,
 ) -> str:
     """
     Send one or more images to Gemini Flash and return a suggested Instagram caption.
-    Falls back to Claude Sonnet if GEMINI_API_KEY is not set.
+    Falls back to Claude Sonnet if gemini_api_key is not set.
     Optionally accepts date_str and location_str from photo EXIF to enrich the caption.
+    `creds` is a per-user credentials dict; falls back to env vars when None.
     """
-    gemini_key = os.environ.get("GEMINI_API_KEY", "").strip()
+    gemini_key = (
+        (creds.get("gemini_api_key") if creds else None)
+        or os.environ.get("GEMINI_API_KEY", "")
+    ).strip()
+
     if gemini_key and gemini_key != "your-gemini-api-key-here":
         caption = _generate_with_gemini(images, tone, gemini_key, location_str)
     else:
-        caption = _generate_with_claude(images, tone, location_str)
+        caption = _generate_with_claude(images, tone, location_str, creds=creds)
 
     if date_str:
         body, hashtags = _split_hashtags(caption)
@@ -101,10 +107,22 @@ def _generate_with_gemini(
 
 # ── Claude fallback ───────────────────────────────────────────────────────────
 
-def _generate_with_claude(images: list[tuple[bytes, str]], tone: str, location_str=None) -> str:
+def _generate_with_claude(
+    images: list[tuple[bytes, str]],
+    tone: str,
+    location_str=None,
+    creds: dict | None = None,
+) -> str:
     import anthropic
 
-    client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+    api_key = (
+        (creds.get("anthropic_api_key") if creds else None)
+        or os.environ.get("ANTHROPIC_API_KEY", "")
+    )
+    if not api_key:
+        raise RuntimeError("No Gemini or Anthropic API key configured.")
+
+    client = anthropic.Anthropic(api_key=api_key)
 
     content = []
     for image_bytes, mime_type in images:

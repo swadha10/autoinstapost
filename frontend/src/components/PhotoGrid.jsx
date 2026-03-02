@@ -1,5 +1,10 @@
 import { useState } from "react";
-import { photoRawUrl } from "../api/client";
+import { photoRawUrl, pickerThumbUrl } from "../api/client";
+
+function resolveThumbUrl(photo) {
+  if (photo.source === "gphotos_picker") return pickerThumbUrl(photo.id);
+  return photo.thumbnailUrl || photoRawUrl(photo.id);
+}
 
 const MAX_SELECT = 10;
 
@@ -87,7 +92,7 @@ function PhotoCard({ photo, order, dimmed, shared, onToggle, onMark }) {
 
   return (
     <div style={s.card(order, dimmed)} onClick={() => onToggle(photo)}>
-      <img src={photoRawUrl(photo.id)} alt={photo.name} style={s.img} loading="lazy" />
+      <img src={resolveThumbUrl(photo)} alt={photo.name} style={s.img} loading="lazy" />
 
       {order > 0 && <div style={s.orderBadge}>{order}</div>}
       {!order && shared && <div style={s.sharedBadge}>Shared</div>}

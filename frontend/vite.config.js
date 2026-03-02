@@ -5,10 +5,12 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
+      "/auth": "http://localhost:8000",
       "/drive": "http://localhost:8000",
       "/caption": "http://localhost:8000",
       "/instagram": "http://localhost:8000",
       "/schedule": "http://localhost:8000",
+      "/photos": "http://localhost:8000",
       "/temp": "http://localhost:8000",
     },
   },

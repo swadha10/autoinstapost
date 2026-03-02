@@ -1,22 +1,26 @@
 """Routes for schedule configuration and pending post approvals."""
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
+from auth import get_current_user
+from db import get_credentials
 from services.schedule_service import (
     approve_pending_post,
     load_config,
     load_history,
     load_pending,
+    load_posted_ids,
     log_post_attempt,
+    record_posted_id,
     reject_pending_post,
+    remove_posted_id,
     save_config,
 )
 
 router = APIRouter(prefix="/schedule", tags=["schedule"])
 
-
-from services.schedule_service import DEFAULT_CAPTION  # noqa: E402 (after router import)
+from services.schedule_service import DEFAULT_CAPTION  # noqa: E402
 
 
 class ScheduleConfig(BaseModel):
@@ -26,6 +30,8 @@ class ScheduleConfig(BaseModel):
     cadence: str = "daily"
     every_n_days: int = 1
     weekdays: list[int] = [0, 1, 2, 3, 4]
+    source: str = "drive"
+    timezone: str = "UTC"
     folder_id: str = ""
     tone: str = "engaging"
     require_approval: bool = True
@@ -46,57 +52,48 @@ def get_timezone():
 
 
 @router.get("/config")
-def get_config():
-    return load_config()
+def get_config(current_user: dict = Depends(get_current_user)):
+    return load_config(current_user["id"])
 
 
 @router.post("/config")
-def set_config(config: ScheduleConfig, request: Request):
+def set_config(config: ScheduleConfig, request: Request, current_user: dict = Depends(get_current_user)):
+    user_id = current_user["id"]
     data = config.model_dump()
-    save_config(data)
+    save_config(data, user_id)
 
-    # Re-schedule the APScheduler job with new settings
     scheduler = request.app.state.scheduler
-    _reschedule(scheduler, data)
+    _reschedule_user(scheduler, data, user_id)
 
     return {"success": True, "config": data}
 
 
 @router.get("/posted-ids")
-def get_posted_ids():
-    """Return the set of Drive file IDs that have already been posted."""
-    from services.schedule_service import load_posted_ids
-    return sorted(load_posted_ids())
+def get_posted_ids(current_user: dict = Depends(get_current_user)):
+    return sorted(load_posted_ids(current_user["id"]))
 
 
 @router.post("/posted-ids/{file_id}")
-def mark_as_posted(file_id: str):
-    """Manually mark a photo as already shared (e.g. posted before tracking existed)."""
-    from services.schedule_service import record_posted_id
-    record_posted_id(file_id)
+def mark_as_posted(file_id: str, current_user: dict = Depends(get_current_user)):
+    record_posted_id(file_id, current_user["id"])
     return {"success": True}
 
 
 @router.delete("/posted-ids/{file_id}")
-def unmark_as_posted(file_id: str):
-    """Remove a photo from the posted history so it can be reused."""
-    from services.schedule_service import load_posted_ids, POSTED_FILE
-    ids = load_posted_ids()
-    ids.discard(file_id)
-    POSTED_FILE.parent.mkdir(parents=True, exist_ok=True)
-    POSTED_FILE.write_text(__import__("json").dumps(sorted(ids), indent=2))
+def unmark_as_posted(file_id: str, current_user: dict = Depends(get_current_user)):
+    remove_posted_id(file_id, current_user["id"])
     return {"success": True}
 
 
 @router.get("/pending")
-def get_pending():
-    return load_pending()
+def get_pending(current_user: dict = Depends(get_current_user)):
+    return load_pending(current_user["id"])
 
 
 @router.post("/pending/{post_id}/approve")
-def approve_post(post_id: str):
+def approve_post(post_id: str, current_user: dict = Depends(get_current_user)):
     try:
-        found = approve_pending_post(post_id)
+        found = approve_pending_post(post_id, current_user["id"])
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     if not found:
@@ -105,36 +102,37 @@ def approve_post(post_id: str):
 
 
 @router.delete("/pending/{post_id}")
-def reject_post(post_id: str):
-    found = reject_pending_post(post_id)
+def reject_post(post_id: str, current_user: dict = Depends(get_current_user)):
+    found = reject_pending_post(post_id, current_user["id"])
     if not found:
         raise HTTPException(status_code=404, detail="Pending post not found")
     return {"success": True}
 
 
 @router.get("/history")
-def get_history():
-    return load_history()
+def get_history(current_user: dict = Depends(get_current_user)):
+    return load_history(current_user["id"])
 
 
 @router.post("/run-now")
-def run_now():
-    """Trigger the scheduled job immediately for testing."""
+def run_now(current_user: dict = Depends(get_current_user)):
     from services.schedule_service import run_scheduled_job
     import threading
-    threading.Thread(target=run_scheduled_job, daemon=True).start()
+    user_id = current_user["id"]
+    threading.Thread(target=run_scheduled_job, args=(user_id,), daemon=True).start()
     return {"success": True, "message": "Job triggered — check History tab in ~30s"}
 
 
 @router.get("/status")
-def get_status(request: Request):
-    """Return next scheduled run time + pre-flight validation checks."""
+def get_status(request: Request, current_user: dict = Depends(get_current_user)):
     import os
-    from services.schedule_service import load_posted_ids
+    user_id = current_user["id"]
+    creds = get_credentials(user_id)
 
-    config = load_config()
+    config = load_config(user_id)
     scheduler = request.app.state.scheduler
-    job = scheduler.get_job("auto_post")
+    job_id = f"auto_post_{user_id}"
+    job = scheduler.get_job(job_id)
     next_run = job.next_run_time.isoformat() if (job and job.next_run_time) else None
 
     checks = []
@@ -147,43 +145,72 @@ def get_status(request: Request):
         "message": "Enabled" if enabled else "Disabled — turn on in the Schedule tab",
     })
 
-    # 2. Folder configured
+    # 2. Source / folder configured
+    source = config.get("source", "drive")
     folder_id = config.get("folder_id", "").strip()
-    checks.append({
-        "name": "Drive folder",
-        "ok": bool(folder_id),
-        "message": "Folder configured" if folder_id else "No folder ID set — add one in the Schedule tab",
-    })
-
-    # 3. Fresh photos available
     upcoming_pool = []
-    if folder_id:
-        try:
-            from services.drive_service import list_photos
-            photos = list_photos(folder_id)
-            posted = load_posted_ids()
-            fresh = [p for p in photos if p["id"] not in posted]
-            upcoming_pool = [{"id": p["id"], "name": p.get("name", "")} for p in fresh]
-            checks.append({
-                "name": "Fresh photos",
-                "ok": len(fresh) > 0,
-                "message": f"{len(fresh)} unposted photo{'s' if len(fresh) != 1 else ''} available"
-                           if fresh else "All photos already posted — unmark some in the Manual tab",
-            })
-        except Exception as e:
-            checks.append({"name": "Fresh photos", "ok": False, "message": f"Drive error: {e}"})
-    else:
-        checks.append({"name": "Fresh photos", "ok": False, "message": "Set a folder first"})
 
-    # 4. Public URL reachable by Instagram — actually probe it, don't just check the string
+    if source == "gphotos_picker":
+        picker_session = (creds or {}).get("google_picker_session_id", "")
+        checks.append({
+            "name": "Google Photos",
+            "ok": bool(picker_session),
+            "message": "Picker session active" if picker_session else "No picker session — open Google Photos Picker in the Schedule tab",
+        })
+        # Fresh photos check for picker
+        if picker_session:
+            try:
+                from services.photos_service import list_picker_items, _get_access_token as _gphotos_token
+                access_token = _gphotos_token(creds)
+                photos = list_picker_items(picker_session, access_token)
+                posted = load_posted_ids(user_id)
+                fresh = [p for p in photos if p["id"] not in posted]
+                checks.append({
+                    "name": "Fresh photos",
+                    "ok": len(fresh) > 0,
+                    "message": f"{len(fresh)} unposted photo{'s' if len(fresh) != 1 else ''} available"
+                               if fresh else "All photos in picker already posted — open a new picker session",
+                })
+            except Exception as e:
+                checks.append({"name": "Fresh photos", "ok": False, "message": f"Google Photos error: {e}"})
+        else:
+            checks.append({"name": "Fresh photos", "ok": False, "message": "Set up Google Photos picker first"})
+    else:
+        checks.append({
+            "name": "Drive folder",
+            "ok": bool(folder_id),
+            "message": "Folder configured" if folder_id else "No folder ID set — add one in the Schedule tab",
+        })
+        if folder_id:
+            try:
+                from services.drive_service import list_photos
+                photos = list_photos(folder_id, creds=creds)
+                posted = load_posted_ids(user_id)
+                fresh = [p for p in photos if p["id"] not in posted]
+                upcoming_pool = [{"id": p["id"], "name": p.get("name", "")} for p in fresh]
+                checks.append({
+                    "name": "Fresh photos",
+                    "ok": len(fresh) > 0,
+                    "message": f"{len(fresh)} unposted photo{'s' if len(fresh) != 1 else ''} available"
+                               if fresh else "All photos already posted — unmark some in the Manual tab",
+                })
+            except Exception as e:
+                checks.append({"name": "Fresh photos", "ok": False, "message": f"Drive error: {e}"})
+        else:
+            checks.append({"name": "Fresh photos", "ok": False, "message": "Set a folder first"})
+
+    # 4. Public URL reachable by Instagram
     import httpx as _httpx
-    public_url = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
+    public_url = (
+        (creds.get("public_base_url") if creds else None)
+        or os.environ.get("PUBLIC_BASE_URL", "")
+    ).rstrip("/")
     looks_public = bool(public_url) and "localhost" not in public_url and "127.0.0.1" not in public_url
     if not looks_public:
         checks.append({
             "name": "Public image URL",
             "ok": False,
-            "message": "PUBLIC_BASE_URL not set or points to localhost — Instagram can't fetch images",
+            "message": "public_base_url not set or points to localhost — Instagram can't fetch images",
         })
     else:
         try:
@@ -195,13 +222,13 @@ def get_status(request: Request):
             "name": "Public image URL",
             "ok": reachable,
             "message": public_url if reachable
-                       else f"Tunnel unreachable ({public_url}) — restart Cloudflare and update PUBLIC_BASE_URL in .env",
+                       else f"Tunnel unreachable ({public_url}) — restart Cloudflare and update public_base_url",
         })
 
     # 5. Instagram token valid
     try:
         from services.instagram_service import get_token_status
-        ts = get_token_status()
+        ts = get_token_status(creds=creds)
         token_ok = ts.get("valid", False)
         days = ts.get("days_left")
         status_str = ts.get("status", "")
@@ -222,17 +249,16 @@ def get_status(request: Request):
 
 
 # ---------------------------------------------------------------------------
-# Internal helper — kept here to avoid circular imports with main.py
+# Scheduler helpers
 # ---------------------------------------------------------------------------
 
-def _reschedule(scheduler, config: dict) -> None:
-    """Remove the existing scheduled job and add a new one based on *config*."""
+def _reschedule_user(scheduler, config: dict, user_id: int) -> None:
+    """Remove existing job for this user and add a new one based on config."""
     from apscheduler.triggers.cron import CronTrigger
     from services.schedule_service import run_scheduled_job
 
-    job_id = "auto_post"
+    job_id = f"auto_post_{user_id}"
 
-    # Remove old job if present
     if scheduler.get_job(job_id):
         scheduler.remove_job(job_id)
 
@@ -242,17 +268,30 @@ def _reschedule(scheduler, config: dict) -> None:
     hour = config.get("hour", 8)
     minute = config.get("minute", 0)
     cadence = config.get("cadence", "daily")
+    tz = config.get("timezone", "UTC")
 
     if cadence == "daily":
-        trigger = CronTrigger(hour=hour, minute=minute)
+        trigger = CronTrigger(hour=hour, minute=minute, timezone=tz)
     elif cadence == "every_n_days":
         n = max(1, config.get("every_n_days", 1))
-        trigger = CronTrigger(hour=hour, minute=minute, day=f"*/{n}")
+        trigger = CronTrigger(hour=hour, minute=minute, day=f"*/{n}", timezone=tz)
     elif cadence == "weekdays":
         days = config.get("weekdays", [0, 1, 2, 3, 4])
         day_str = ",".join(str(d) for d in days)
-        trigger = CronTrigger(day_of_week=day_str, hour=hour, minute=minute)
+        trigger = CronTrigger(day_of_week=day_str, hour=hour, minute=minute, timezone=tz)
     else:
-        trigger = CronTrigger(hour=hour, minute=minute)
+        trigger = CronTrigger(hour=hour, minute=minute, timezone=tz)
 
-    scheduler.add_job(run_scheduled_job, trigger=trigger, id=job_id, replace_existing=True)
+    scheduler.add_job(
+        run_scheduled_job,
+        trigger=trigger,
+        id=job_id,
+        replace_existing=True,
+        kwargs={"user_id": user_id},
+    )
+
+
+# Keep legacy alias for backwards compat (main.py import)
+def _reschedule(scheduler, config: dict) -> None:
+    """Legacy single-user reschedule — calls _reschedule_user with user_id=None."""
+    _reschedule_user(scheduler, config, user_id=None)

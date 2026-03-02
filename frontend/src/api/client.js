@@ -1,115 +1,189 @@
 const BASE = "";  // proxied by Vite in dev
 
-export async function getFolderInfo(folderId) {
-  const res = await fetch(`${BASE}/drive/folder/${encodeURIComponent(folderId)}`);
-  if (!res.ok) throw new Error(await res.text());
+function authHeaders() {
+  const token = localStorage.getItem("aip_token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+async function apiFetch(url, options = {}) {
+  const res = await fetch(url, {
+    ...options,
+    headers: {
+      ...authHeaders(),
+      "ngrok-skip-browser-warning": "1",
+      ...(options.headers || {}),
+    },
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    let detail = text;
+    try { detail = JSON.parse(text).detail || text; } catch {}
+    throw new Error(detail);
+  }
   return res.json();
+}
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+
+export async function register(email, password) {
+  return apiFetch(`${BASE}/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+}
+
+export async function loginApi(email, password) {
+  return apiFetch(`${BASE}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+}
+
+export async function getMe() {
+  return apiFetch(`${BASE}/auth/me`);
+}
+
+export async function getMyCredentials() {
+  return apiFetch(`${BASE}/auth/credentials`);
+}
+
+export async function saveCredentials(creds) {
+  return apiFetch(`${BASE}/auth/credentials`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(creds),
+  });
+}
+
+export async function getInstagramConnectUrl() {
+  return apiFetch(`${BASE}/auth/instagram/connect`);
+}
+
+export async function getGoogleConnectUrl() {
+  return apiFetch(`${BASE}/auth/google/connect`);
+}
+
+// ── Google Photos ──────────────────────────────────────────────────────────────
+
+export async function fetchAlbums() {
+  return apiFetch(`${BASE}/photos/albums`);
+}
+
+export async function fetchAlbumPhotos(albumId) {
+  return apiFetch(`${BASE}/photos/album/${encodeURIComponent(albumId)}/media`);
+}
+
+export function photoAlbumRawUrl(mediaId) {
+  const token = localStorage.getItem("aip_token") || "";
+  return `${BASE}/photos/media/${mediaId}/raw?token=${encodeURIComponent(token)}`;
+}
+
+export async function startGooglePicker() {
+  return apiFetch(`${BASE}/photos/picker/start`, { method: "POST" });
+}
+
+export async function getPickerPhotos() {
+  return apiFetch(`${BASE}/photos/picker/items`);
+}
+
+export function pickerThumbUrl(mediaId) {
+  const token = localStorage.getItem("aip_token") || "";
+  return `${BASE}/photos/picker/media/${mediaId}/raw?token=${encodeURIComponent(token)}`;
+}
+
+// ── Drive ─────────────────────────────────────────────────────────────────────
+
+export async function getFolderInfo(folderId) {
+  return apiFetch(`${BASE}/drive/folder/${encodeURIComponent(folderId)}`);
 }
 
 export async function fetchPhotos(folderId) {
-  const res = await fetch(`${BASE}/drive/photos?folder_id=${encodeURIComponent(folderId)}`);
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
+  return apiFetch(`${BASE}/drive/photos?folder_id=${encodeURIComponent(folderId)}`);
 }
 
 export function photoRawUrl(fileId) {
-  return `${BASE}/drive/photo/${fileId}/raw`;
+  const token = localStorage.getItem("aip_token") || "";
+  return `${BASE}/drive/photo/${fileId}/raw?token=${encodeURIComponent(token)}`;
 }
+
+// ── Caption ───────────────────────────────────────────────────────────────────
 
 export async function generateCaption(fileIds, tone = "engaging") {
   const ids = Array.isArray(fileIds) ? fileIds : [fileIds];
-  const res = await fetch(`${BASE}/caption/generate`, {
+  return apiFetch(`${BASE}/caption/generate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ file_ids: ids, tone }),
   });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
 }
 
-export async function postToInstagram(fileIds, caption) {
+// ── Instagram ─────────────────────────────────────────────────────────────────
+
+export async function getInstagramAccount() {
+  return apiFetch(`${BASE}/instagram/account-info`);
+}
+
+export async function postToInstagram(fileIds, caption, source = "drive", pickerSessionId = null) {
   const ids = Array.isArray(fileIds) ? fileIds : [fileIds];
-  const res = await fetch(`${BASE}/instagram/post`, {
+  return apiFetch(`${BASE}/instagram/post`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ file_ids: ids, caption }),
+    body: JSON.stringify({ file_ids: ids, caption, source, picker_session_id: pickerSessionId }),
   });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
 }
 
+// ── Schedule ──────────────────────────────────────────────────────────────────
+
 export async function getPostedIds() {
-  const res = await fetch(`${BASE}/schedule/posted-ids`);
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
+  return apiFetch(`${BASE}/schedule/posted-ids`);
 }
 
 export async function markAsPosted(fileId) {
-  const res = await fetch(`${BASE}/schedule/posted-ids/${fileId}`, { method: "POST" });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
+  return apiFetch(`${BASE}/schedule/posted-ids/${fileId}`, { method: "POST" });
 }
 
 export async function unmarkAsPosted(fileId) {
-  const res = await fetch(`${BASE}/schedule/posted-ids/${fileId}`, { method: "DELETE" });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
+  return apiFetch(`${BASE}/schedule/posted-ids/${fileId}`, { method: "DELETE" });
 }
 
 export async function getServerTimezone() {
-  const res = await fetch(`${BASE}/schedule/timezone`);
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
+  return apiFetch(`${BASE}/schedule/timezone`);
 }
 
 export async function getScheduleConfig() {
-  const res = await fetch(`${BASE}/schedule/config`);
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
+  return apiFetch(`${BASE}/schedule/config`);
 }
 
 export async function saveScheduleConfig(config) {
-  const res = await fetch(`${BASE}/schedule/config`, {
+  return apiFetch(`${BASE}/schedule/config`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(config),
   });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
 }
 
 export async function getPendingPosts() {
-  const res = await fetch(`${BASE}/schedule/pending`);
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
+  return apiFetch(`${BASE}/schedule/pending`);
 }
 
 export async function approvePost(id) {
-  const res = await fetch(`${BASE}/schedule/pending/${id}/approve`, { method: "POST" });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
+  return apiFetch(`${BASE}/schedule/pending/${id}/approve`, { method: "POST" });
 }
 
 export async function rejectPost(id) {
-  const res = await fetch(`${BASE}/schedule/pending/${id}`, { method: "DELETE" });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
+  return apiFetch(`${BASE}/schedule/pending/${id}`, { method: "DELETE" });
 }
 
 export async function getPostHistory() {
-  const res = await fetch(`${BASE}/schedule/history`);
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
+  return apiFetch(`${BASE}/schedule/history`);
 }
 
 export async function getScheduleStatus() {
-  const res = await fetch(`${BASE}/schedule/status`);
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
+  return apiFetch(`${BASE}/schedule/status`);
 }
 
 export async function runScheduleNow() {
-  const res = await fetch(`${BASE}/schedule/run-now`, { method: "POST" });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
+  return apiFetch(`${BASE}/schedule/run-now`, { method: "POST" });
 }

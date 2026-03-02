@@ -1,12 +1,18 @@
 import { useEffect, useState } from "react";
-import { photoRawUrl } from "../api/client";
+import { photoRawUrl, pickerThumbUrl } from "../api/client";
+
+function resolveThumbUrl(photo) {
+  if (photo?.source === "gphotos_picker") return pickerThumbUrl(photo.id);
+  return photo?.thumbnailUrl || photoRawUrl(photo?.id);
+}
 
 const styles = {
   wrapper: {
     background: "#fff",
     border: "1px solid #dbdbdb",
     borderRadius: "12px",
-    maxWidth: "380px",
+    width: "100%",
+    maxWidth: "420px",
     overflow: "hidden",
     fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
   },
@@ -67,7 +73,7 @@ const styles = {
   },
 };
 
-export default function PostPreview({ photos = [], caption, onPost, posting, posted }) {
+export default function PostPreview({ photos = [], caption, onPost, posting, posted, igAccount }) {
   const [idx, setIdx] = useState(0);
   const isCarousel = photos.length > 1;
   const photo = photos[idx] ?? null;
@@ -82,14 +88,33 @@ export default function PostPreview({ photos = [], caption, onPost, posting, pos
   return (
     <div style={styles.wrapper}>
       <div style={styles.header}>
-        <div style={styles.avatar} />
-        <span style={styles.username}>your_account</span>
+        {igAccount?.profile_picture_url ? (
+          <img
+            src={igAccount.profile_picture_url}
+            alt=""
+            style={{ ...styles.avatar, objectFit: "cover" }}
+            onError={(e) => { e.target.style.display = "none"; e.target.nextSibling.style.display = "block"; }}
+          />
+        ) : null}
+        <div
+          style={{
+            ...styles.avatar,
+            display: igAccount?.profile_picture_url ? "none" : "block",
+          }}
+        />
+        {igAccount?.not_configured || !igAccount?.username ? (
+          <span style={{ fontSize: "12px", color: "#e1306c", fontWeight: 600 }}>
+            ⚠️ Connect Instagram in Setup tab
+          </span>
+        ) : (
+          <span style={styles.username}>@{igAccount.username}</span>
+        )}
         {isCarousel && <span style={styles.carouselType}>📷 Carousel · {photos.length}</span>}
       </div>
 
       <div style={styles.imgWrap}>
         {photo ? (
-          <img src={photoRawUrl(photo.id)} alt={photo.name} style={styles.img} />
+          <img src={resolveThumbUrl(photo)} alt={photo.name} style={styles.img} />
         ) : (
           <div style={styles.placeholder}>
             <span style={{ color: "#aaa", fontSize: "13px" }}>Select a photo</span>
