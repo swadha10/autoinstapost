@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { getFolderInfo, getScheduleConfig, saveCredentials, saveScheduleConfig } from "../api/client";
+import { getFolderInfo, getScheduleConfig, saveCredentials, saveScheduleConfig, getInstagramConnectUrl, getMyCredentials } from "../api/client";
 
 const SA_EMAIL = "insta-auto-post@insta-auto-post-488807.iam.gserviceaccount.com";
 const IG_GRADIENT = "linear-gradient(135deg, #405de6, #5851db, #833ab4, #c13584, #e1306c, #fd1d1d)";
@@ -60,13 +60,34 @@ export default function SetupWizard() {
   const [verifyError, setVerifyError] = useState("");
 
   // Step 2 — Instagram
-  const [igUrl, setIgUrl] = useState("");
-  const [igToken, setIgToken] = useState("");
-  const [igAccountId, setIgAccountId] = useState("");
-  const [fbAppId, setFbAppId] = useState("");
-  const [fbAppSecret, setFbAppSecret] = useState("");
-  const [publicBaseUrl, setPublicBaseUrl] = useState("");
-  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [igConnected, setIgConnected] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+  const [oauthMsg, setOauthMsg] = useState(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("ig_connected") === "1") {
+      setOauthMsg({ type: "success", text: "Instagram connected!" });
+      setIgConnected(true);
+      window.history.replaceState({}, "", window.location.pathname);
+      setStep(1); // jump to step 2 if redirected back here
+    } else if (params.get("ig_error")) {
+      const errMap = {
+        cancelled: "Connection cancelled.",
+        invalid_state: "Security check failed — please try again.",
+        token_exchange_failed: "Could not exchange token with Facebook.",
+        longtoken_failed: "Could not get long-lived token.",
+      };
+      const code = params.get("ig_error");
+      setOauthMsg({ type: "error", text: errMap[code] || `OAuth error: ${code}` });
+      window.history.replaceState({}, "", window.location.pathname);
+      setStep(1);
+    }
+    // Check if already connected
+    getMyCredentials().then((c) => {
+      if (c.instagram_access_token) setIgConnected(true);
+    }).catch(() => {});
+  }, []);
 
   async function handleVerify(e) {
     e.preventDefault();
@@ -102,23 +123,15 @@ export default function SetupWizard() {
     }
   }
 
-  async function handleStep2Next(e) {
-    e.preventDefault();
-    setSaving(true);
+  async function handleConnectInstagram() {
+    setConnecting(true);
     setError("");
     try {
-      await saveCredentials({
-        instagram_access_token: igToken.trim(),
-        instagram_account_id: igAccountId.trim(),
-        facebook_app_id: fbAppId.trim(),
-        facebook_app_secret: fbAppSecret.trim(),
-        public_base_url: publicBaseUrl.trim(),
-      });
-      setStep(2);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setSaving(false);
+      const data = await getInstagramConnectUrl();
+      window.location.href = data.url;
+    } catch (e) {
+      setError(e.message);
+      setConnecting(false);
     }
   }
 
@@ -240,65 +253,55 @@ export default function SetupWizard() {
 
         {/* ── Step 2: Instagram ── */}
         {step === 1 && (
-          <form onSubmit={handleStep2Next}>
-            <div style={fieldStyle}>
-              <label style={labelStyle}>Your Instagram profile URL</label>
-              <input
-                style={inputStyle}
-                placeholder="https://www.instagram.com/yourusername"
-                value={igUrl}
-                onChange={(e) => setIgUrl(e.target.value)}
-              />
-              <p style={hintStyle}>e.g. instagram.com/yourhandle</p>
-            </div>
+          <div>
+            <p style={{ fontSize: "13px", color: "#555", lineHeight: "1.6", marginBottom: "20px" }}>
+              Connect your Instagram Business or Creator account via Facebook Login.
+            </p>
 
-            <div style={{ borderTop: "1px solid #eee", paddingTop: "16px", marginTop: "4px" }}>
-              <p style={{ fontSize: "13px", color: "#555", lineHeight: "1.6", marginBottom: "14px" }}>
-                To enable automatic posting, add your Instagram API credentials:
-              </p>
-
-              <div style={fieldStyle}>
-                <label style={labelStyle}>Access Token</label>
-                <input style={inputStyle} placeholder="EAAB…" value={igToken} onChange={(e) => setIgToken(e.target.value)} />
-                <p style={hintStyle}>Long-lived token from Meta for Developers</p>
+            {oauthMsg && (
+              <div style={{
+                marginBottom: "16px", padding: "12px 16px", borderRadius: "10px",
+                background: oauthMsg.type === "success" ? "#e6f9ee" : "#fff0f0",
+                border: `1px solid ${oauthMsg.type === "success" ? "#a3d9b1" : "#fcc"}`,
+                color: oauthMsg.type === "success" ? "#1a7a40" : "#c00",
+                fontWeight: 600, fontSize: "13px",
+              }}>
+                {oauthMsg.type === "success" ? "✓ " : "✗ "}{oauthMsg.text}
               </div>
+            )}
 
-              <div style={fieldStyle}>
-                <label style={labelStyle}>Instagram Account ID</label>
-                <input style={inputStyle} placeholder="17841400…" value={igAccountId} onChange={(e) => setIgAccountId(e.target.value)} />
-                <p style={hintStyle}>Numeric ID of your Instagram Business / Creator account</p>
+            {igConnected ? (
+              <div style={{ marginBottom: "20px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "14px 16px", background: "#e6f9ee", border: "1px solid #a3d9b1", borderRadius: "10px" }}>
+                  <span style={{ fontSize: "22px" }}>✓</span>
+                  <div style={{ fontWeight: 700, color: "#1a7a40", fontSize: "14px" }}>Instagram connected!</div>
+                </div>
               </div>
-
+            ) : (
               <button
-                type="button"
-                onClick={() => setShowAdvanced(!showAdvanced)}
-                style={{ background: "none", border: "none", cursor: "pointer", fontSize: "13px", color: "#888", padding: "0 0 14px", textDecoration: "underline" }}
+                onClick={handleConnectInstagram}
+                disabled={connecting}
+                style={{
+                  width: "100%", padding: "14px",
+                  background: connecting ? "#ccc" : "#1877f2",
+                  color: "#fff", border: "none", borderRadius: "10px",
+                  cursor: connecting ? "not-allowed" : "pointer",
+                  fontSize: "15px", fontWeight: 700, marginBottom: "12px",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: "10px",
+                }}
               >
-                {showAdvanced ? "Hide" : "Show"} advanced (App ID, App Secret, Base URL)
+                <span style={{ fontSize: "20px" }}>f</span>
+                {connecting ? "Redirecting to Facebook…" : "Connect with Facebook"}
               </button>
+            )}
 
-              {showAdvanced && (
-                <>
-                  <div style={fieldStyle}>
-                    <label style={labelStyle}>Facebook App ID</label>
-                    <input style={inputStyle} value={fbAppId} onChange={(e) => setFbAppId(e.target.value)} />
-                  </div>
-                  <div style={fieldStyle}>
-                    <label style={labelStyle}>Facebook App Secret</label>
-                    <input style={inputStyle} type="password" value={fbAppSecret} onChange={(e) => setFbAppSecret(e.target.value)} />
-                  </div>
-                  <div style={fieldStyle}>
-                    <label style={labelStyle}>Public Base URL</label>
-                    <input style={inputStyle} placeholder="https://your-server.com" value={publicBaseUrl} onChange={(e) => setPublicBaseUrl(e.target.value)} />
-                    <p style={hintStyle}>Public URL of this server — needed for Instagram video uploads</p>
-                  </div>
-                </>
-              )}
+            <div style={{ padding: "10px 14px", background: "#fff8e6", borderRadius: "8px", border: "1px solid #f5d88a", fontSize: "12px", color: "#78350f", lineHeight: "1.6", marginBottom: "20px" }}>
+              Make sure your Instagram account is a <strong>Business</strong> or <strong>Creator</strong> account — Personal accounts won't work.
             </div>
 
             {error && <div style={{ color: "#c00", fontSize: "13px", marginBottom: "12px" }}>{error}</div>}
 
-            <div style={{ display: "flex", gap: "10px", marginTop: "4px" }}>
+            <div style={{ display: "flex", gap: "10px" }}>
               <button
                 type="button"
                 onClick={handleSkip}
@@ -306,15 +309,17 @@ export default function SetupWizard() {
               >
                 Skip for now
               </button>
-              <button
-                type="submit"
-                disabled={saving}
-                style={{ flex: 2, padding: "12px", background: saving ? "#ccc" : IG_GRADIENT, color: "#fff", border: "none", borderRadius: "10px", cursor: saving ? "not-allowed" : "pointer", fontWeight: 700, fontSize: "15px" }}
-              >
-                {saving ? "Saving…" : "Save & Continue →"}
-              </button>
+              {igConnected && (
+                <button
+                  type="button"
+                  onClick={() => setStep(2)}
+                  style={{ flex: 2, padding: "12px", background: IG_GRADIENT, color: "#fff", border: "none", borderRadius: "10px", cursor: "pointer", fontWeight: 700, fontSize: "15px" }}
+                >
+                  Continue →
+                </button>
+              )}
             </div>
-          </form>
+          </div>
         )}
 
         {/* ── Step 3: Done ── */}

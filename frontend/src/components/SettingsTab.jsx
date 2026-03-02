@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getMyCredentials, saveCredentials, getInstagramConnectUrl, getGoogleConnectUrl } from "../api/client";
+import { getMyCredentials, getInstagramConnectUrl, getGoogleConnectUrl } from "../api/client";
 
 const s = {
   card: {
@@ -11,28 +11,6 @@ const s = {
   },
   sectionTitle: { fontSize: "15px", fontWeight: 700, color: "#111", marginBottom: "4px" },
   sectionSub: { fontSize: "12px", color: "#999", marginBottom: "16px" },
-  fieldWrap: { marginBottom: "14px" },
-  label: { display: "block", fontSize: "13px", fontWeight: 600, color: "#444", marginBottom: "5px" },
-  input: {
-    width: "100%", padding: "9px 12px",
-    border: "1px solid #ddd", borderRadius: "8px",
-    fontSize: "13px", outline: "none", boxSizing: "border-box",
-    fontFamily: "inherit",
-  },
-  hint: { fontSize: "11px", color: "#aaa", marginTop: "3px" },
-  saveBtn: (loading) => ({
-    padding: "10px 24px",
-    background: loading ? "#ccc" : "#111",
-    color: "#fff", border: "none", borderRadius: "8px",
-    cursor: loading ? "not-allowed" : "pointer",
-    fontWeight: 700, fontSize: "14px", width: "100%",
-  }),
-  savedBadge: {
-    display: "block", textAlign: "center",
-    background: "#e6f9ee", color: "#1a7a40",
-    borderRadius: "6px", padding: "8px",
-    fontSize: "13px", fontWeight: 600, marginTop: "8px",
-  },
   errorBadge: {
     display: "block", textAlign: "center",
     background: "#fff0f0", color: "#c00",
@@ -41,121 +19,9 @@ const s = {
   },
 };
 
-const link = (href, text) => (
-  <a href={href} target="_blank" rel="noreferrer"
-    style={{ color: "#c13584", fontWeight: 600, textDecoration: "none" }}>
-    {text}
-  </a>
-);
-
-const step = (n, text) => (
-  <div style={{ display: "flex", gap: "10px", marginBottom: "10px", alignItems: "flex-start" }}>
-    <div style={{
-      minWidth: "22px", height: "22px", borderRadius: "50%",
-      background: "#405de6", color: "#fff",
-      fontSize: "12px", fontWeight: 700,
-      display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-    }}>{n}</div>
-    <div style={{ fontSize: "13px", color: "#444", lineHeight: "1.6" }}>{text}</div>
-  </div>
-);
-
-function Guide() {
-  const [open, setOpen] = useState(false);
-  return (
-    <div style={{ marginBottom: "16px", borderRadius: "12px", border: "1px solid #e8e8ff", overflow: "hidden" }}>
-      <button
-        onClick={() => setOpen((v) => !v)}
-        style={{
-          width: "100%", padding: "14px 16px",
-          background: "#f5f5ff", border: "none", cursor: "pointer",
-          display: "flex", justifyContent: "space-between", alignItems: "center",
-        }}
-      >
-        <span style={{ fontWeight: 700, fontSize: "14px", color: "#405de6" }}>
-          📖 How to set up your Facebook App (required for OAuth)
-        </span>
-        <span style={{ color: "#405de6", fontSize: "16px" }}>{open ? "▲" : "▼"}</span>
-      </button>
-
-      {open && (
-        <div style={{ padding: "16px", background: "#fafafe", borderTop: "1px solid #e8e8ff" }}>
-
-          {/* Part 1 */}
-          <div style={{ fontWeight: 700, fontSize: "13px", color: "#111", marginBottom: "10px", marginTop: "4px" }}>
-            Part 1 — Create a Facebook App
-          </div>
-          {step(1, <>{link("https://developers.facebook.com/apps/creation", "Go to developers.facebook.com/apps") } → click <strong>Create App</strong></>)}
-          {step(2, <>Choose <strong>Other</strong> → <strong>Business</strong> → give it any name (e.g. "AutoIG")</>)}
-          {step(3, <>In your app dashboard, go to <strong>Add Product</strong> → find <strong>Instagram Graph API</strong> → click <strong>Set Up</strong></>)}
-          {step(4, <>Under <strong>App Settings → Basic</strong>, copy your <strong>App ID</strong> and <strong>App Secret</strong> — paste them below</>)}
-
-          <div style={{ height: "1px", background: "#e8e8ff", margin: "14px 0" }} />
-
-          {/* Part 2 */}
-          <div style={{ fontWeight: 700, fontSize: "13px", color: "#111", marginBottom: "10px" }}>
-            Part 2 — Add the OAuth Redirect URI
-          </div>
-          {step(1, <>In your app dashboard, go to <strong>Facebook Login for Business → Settings</strong></>)}
-          {step(2, <>Under <strong>Valid OAuth Redirect URIs</strong>, add:</>)}
-          <div style={{
-            background: "#1e1e2e", color: "#a6e3a1", borderRadius: "8px",
-            padding: "10px 14px", fontSize: "12px", fontFamily: "monospace",
-            wordBreak: "break-all", marginBottom: "10px",
-          }}>
-            {window.location.origin}/auth/instagram/callback
-          </div>
-          {step(3, <>Click <strong>Save Changes</strong></>)}
-
-          <div style={{ marginTop: "12px", padding: "10px 14px", background: "#fff8e6", borderRadius: "8px", border: "1px solid #f5d88a", fontSize: "12px", color: "#78350f", lineHeight: "1.6" }}>
-            ⚠️ Make sure your Instagram account is a <strong>Business</strong> or <strong>Creator</strong> account — Personal accounts won't work.
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function Field({ label, hint, value, onChange, placeholder, type = "text" }) {
-  return (
-    <div style={s.fieldWrap}>
-      <label style={s.label}>{label}</label>
-      <input
-        type={type}
-        style={s.input}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder || ""}
-        autoComplete="off"
-      />
-      {hint && <div style={s.hint}>{hint}</div>}
-    </div>
-  );
-}
-
-function SecretInput({ label, hint, savedOnServer, onChange, placeholder }) {
-  return (
-    <div style={s.fieldWrap}>
-      <label style={s.label}>
-        {label}
-        {savedOnServer && <span style={{ fontWeight: 400, color: "#1a7a40", marginLeft: "8px", fontSize: "11px" }}>✓ saved</span>}
-      </label>
-      <input
-        type="password"
-        style={s.input}
-        placeholder={savedOnServer ? "••• paste new value to update" : placeholder || ""}
-        onChange={(e) => onChange(e.target.value)}
-        autoComplete="off"
-      />
-      {hint && <div style={s.hint}>{hint}</div>}
-    </div>
-  );
-}
 
 export default function SettingsTab() {
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
   const [connecting, setConnecting] = useState(false);
   const [connectingGoogle, setConnectingGoogle] = useState(false);
@@ -164,12 +30,6 @@ export default function SettingsTab() {
   const [igConnected, setIgConnected] = useState(false);
   const [googleConnected, setGoogleConnected] = useState(false);
   const [igAccountId, setIgAccountId] = useState("");
-
-  // Facebook App credentials (needed to run OAuth)
-  const [fbAppId, setFbAppId] = useState("");
-  const [fbAppSecret, setFbAppSecret] = useState("");
-  const [publicBaseUrl, setPublicBaseUrl] = useState("");
-  const [serverHas, setServerHas] = useState({});
 
   // Check for OAuth result in URL params
   const [oauthMsg, setOauthMsg] = useState(null); // { type: "success"|"error", text }
@@ -210,14 +70,8 @@ export default function SettingsTab() {
     getMyCredentials()
       .then((c) => {
         setIgAccountId(c.instagram_account_id || "");
-        setFbAppId(c.facebook_app_id || "");
-        setPublicBaseUrl(c.public_base_url || "");
         setIgConnected(!!c.instagram_access_token);
         setGoogleConnected(!!c.google_photos_connected);
-        setServerHas({
-          instagram_access_token: !!c.instagram_access_token,
-          facebook_app_secret: !!c.facebook_app_secret,
-        });
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -247,34 +101,10 @@ export default function SettingsTab() {
     }
   }
 
-  async function handleSave() {
-    setSaving(true);
-    setSaved(false);
-    setError("");
-    try {
-      const updates = {
-        facebook_app_id: fbAppId.trim(),
-        public_base_url: publicBaseUrl.trim(),
-        ...(fbAppSecret ? { facebook_app_secret: fbAppSecret } : {}),
-      };
-      await saveCredentials(updates);
-      setSaved(true);
-      setFbAppSecret("");
-      if (fbAppSecret) setServerHas((p) => ({ ...p, facebook_app_secret: true }));
-      setTimeout(() => setSaved(false), 3000);
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setSaving(false);
-    }
-  }
-
   if (loading) return <div style={{ padding: "40px", color: "#999" }}>Loading…</div>;
 
   return (
     <div>
-      <Guide />
-
       {/* OAuth result banner */}
       {oauthMsg && (
         <div style={{
@@ -290,36 +120,6 @@ export default function SettingsTab() {
           {oauthMsg.type === "success" ? "✓ " : "✗ "}{oauthMsg.text}
         </div>
       )}
-
-      {/* Facebook App setup */}
-      <div style={s.card}>
-        <div style={s.sectionTitle}>Facebook App</div>
-        <div style={s.sectionSub}>Required to connect your Instagram account via OAuth</div>
-        <Field
-          label="Facebook App ID"
-          hint="From App Settings → Basic in your Facebook App"
-          value={fbAppId}
-          onChange={setFbAppId}
-          placeholder="123456789…"
-        />
-        <SecretInput
-          label="Facebook App Secret"
-          hint="From App Settings → Basic"
-          savedOnServer={serverHas.facebook_app_secret}
-          onChange={setFbAppSecret}
-        />
-        <Field
-          label="Public URL (ngrok / tunnel)"
-          hint={`Run: ngrok http --domain=your-domain.ngrok-free.dev 8000`}
-          value={publicBaseUrl}
-          onChange={setPublicBaseUrl}
-          placeholder="https://xxxx.ngrok-free.dev"
-        />
-        <button style={s.saveBtn(saving)} onClick={handleSave} disabled={saving}>
-          {saving ? "Saving…" : "Save App Settings"}
-        </button>
-        {saved && <div style={s.savedBadge}>Saved!</div>}
-      </div>
 
       {/* Instagram connect */}
       <div style={s.card}>
@@ -364,15 +164,15 @@ export default function SettingsTab() {
         ) : (
           <button
             onClick={handleConnectInstagram}
-            disabled={connecting || !fbAppId || !serverHas.facebook_app_secret}
+            disabled={connecting}
             style={{
               width: "100%",
               padding: "12px",
-              background: connecting || !fbAppId || !serverHas.facebook_app_secret ? "#ccc" : "#1877f2",
+              background: connecting ? "#ccc" : "#1877f2",
               color: "#fff",
               border: "none",
               borderRadius: "8px",
-              cursor: connecting || !fbAppId || !serverHas.facebook_app_secret ? "not-allowed" : "pointer",
+              cursor: connecting ? "not-allowed" : "pointer",
               fontSize: "14px",
               fontWeight: 700,
               display: "flex",
@@ -384,12 +184,6 @@ export default function SettingsTab() {
             <span style={{ fontSize: "18px" }}>f</span>
             {connecting ? "Redirecting to Facebook…" : "Connect with Facebook"}
           </button>
-        )}
-
-        {(!fbAppId || !serverHas.facebook_app_secret) && !igConnected && (
-          <div style={{ fontSize: "12px", color: "#aaa", marginTop: "8px", textAlign: "center" }}>
-            Save your Facebook App ID and Secret above first
-          </div>
         )}
       </div>
 
