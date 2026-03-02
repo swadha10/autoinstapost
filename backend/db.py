@@ -81,13 +81,15 @@ def get_user_by_id(user_id: int) -> dict | None:
         return dict(row) if row else None
 
 
-def get_credentials(user_id: int) -> dict | None:
+def get_credentials(user_id: int) -> dict:
+    """Return credentials for a user. Always returns a dict (empty if not set up yet).
+    Never returns None so service functions don't fall back to server .env values."""
     with _conn() as conn:
         row = conn.execute(
             "SELECT * FROM credentials WHERE user_id = ?",
             (user_id,),
         ).fetchone()
-        return dict(row) if row else None
+        return dict(row) if row else {}
 
 
 def upsert_credentials(user_id: int, updates: dict) -> None:
@@ -133,4 +135,8 @@ def upsert_credentials(user_id: int, updates: dict) -> None:
 
 def has_credentials(user_id: int) -> bool:
     """Return True if the user has completed initial setup (credentials row exists)."""
-    return get_credentials(user_id) is not None
+    with _conn() as conn:
+        row = conn.execute(
+            "SELECT user_id FROM credentials WHERE user_id = ?", (user_id,)
+        ).fetchone()
+        return row is not None
