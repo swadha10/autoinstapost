@@ -255,7 +255,7 @@ export default function Dashboard() {
     setPostError("");
     setSelectedIds((prev) => {
       if (prev.includes(photo.id)) return prev.filter((id) => id !== photo.id);
-      if (prev.length >= 10) return prev; // Instagram carousel max
+      if (prev.length >= 4) return prev; // carousel max 4
       return [...prev, photo.id];
     });
     setCaption("");
@@ -446,7 +446,7 @@ export default function Dashboard() {
                 <div style={styles.sectionTitle}>
                   2. Select Photos{" "}
                   <span style={{ fontWeight: 400, color: "#888", fontSize: "13px" }}>
-                    ({photos.length} found · tap to select · up to 10 for carousel)
+                    ({photos.length} found · tap to select · up to 4 for carousel)
                   </span>
                 </div>
                 <PhotoGrid

@@ -297,7 +297,7 @@ export default function ScheduleTab() {
               update("hour", h);
             }
             return (
-              <>
+              <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
                 <input
                   type="number" min={1} max={12}
                   style={s.input}
@@ -313,11 +313,16 @@ export default function ScheduleTab() {
                 />
                 <button style={s.toggle(period === "AM")} onClick={() => setTime(hour12, "AM")}>AM</button>
                 <button style={s.toggle(period === "PM")} onClick={() => setTime(hour12, "PM")}>PM</button>
-              </>
+              </div>
             );
           })()}
+        </div>
+
+        {/* Timezone — own row so it doesn't overflow on mobile */}
+        <div style={s.row}>
+          <span style={s.label}>Timezone</span>
           <select
-            style={{ ...s.select, fontSize: "13px" }}
+            style={{ ...s.select, fontSize: "13px", flex: 1, minWidth: "160px", maxWidth: "320px" }}
             value={config.timezone || "America/Los_Angeles"}
             onChange={(e) => update("timezone", e.target.value)}
           >

@@ -1,10 +1,13 @@
 """Routes for browsing Google Drive photos."""
 
+import json
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
+from pydantic import BaseModel
 
 from auth import get_current_user, _get_secret
-from db import get_credentials, get_user_by_id
+from db import get_credentials, get_user_by_id, upsert_credentials
 from services.drive_service import download_photo, get_folder_info, list_photos
 
 router = APIRouter(prefix="/drive", tags=["drive"])
@@ -67,6 +70,27 @@ def get_photos(folder_id: str, current_user: dict = Depends(get_current_user)):
         return {"photos": photos}
     except Exception as e:
         raise _drive_error(e, creds)
+
+
+class SavedFolder(BaseModel):
+    id: str
+    name: str
+
+
+@router.get("/saved-folders")
+def get_saved_folders(current_user: dict = Depends(get_current_user)):
+    creds = get_credentials(current_user["id"])
+    raw = (creds or {}).get("saved_drive_folders") or "[]"
+    try:
+        return json.loads(raw)
+    except Exception:
+        return []
+
+
+@router.put("/saved-folders")
+def put_saved_folders(folders: list[SavedFolder], current_user: dict = Depends(get_current_user)):
+    upsert_credentials(current_user["id"], {"saved_drive_folders": json.dumps([f.model_dump() for f in folders])})
+    return {"ok": True}
 
 
 @router.get("/photo/{file_id}/raw")

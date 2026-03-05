@@ -1,34 +1,49 @@
 /**
  * FolderPicker — shows a list of saved Drive folders and an "Add folder" input.
- * Saved folders are persisted to localStorage, scoped by userId to prevent
- * cross-user data leakage on shared devices.
+ * Saved folders are persisted server-side (per account) so they survive across
+ * browsers and devices. localStorage is used as a fast initial cache only.
  */
-import { useState } from "react";
-import { getFolderInfo } from "../api/client";
+import { useEffect, useState } from "react";
+import { getFolderInfo, getSavedFolders, updateSavedFolders } from "../api/client";
 
 function lsKey(userId) {
   return `aip_saved_folders_${userId || "guest"}`;
 }
 
-function readSaved(userId) {
+function readLocal(userId) {
   try { return JSON.parse(localStorage.getItem(lsKey(userId)) || "[]"); }
   catch { return []; }
 }
 
-function writeSaved(userId, list) {
+function writeLocal(userId, list) {
   localStorage.setItem(lsKey(userId), JSON.stringify(list));
 }
 
 export function useSavedFolders(userId) {
-  const [folders, setFolders] = useState(() => readSaved(userId));
+  const [folders, setFolders] = useState(() => readLocal(userId));
 
-  function _sync(list) { setFolders(list); writeSaved(userId, list); }
+  // Load authoritative list from server on mount
+  useEffect(() => {
+    getSavedFolders()
+      .then((list) => {
+        setFolders(list);
+        writeLocal(userId, list);
+      })
+      .catch(() => {}); // fall back to localStorage cache on error
+  }, [userId]);
 
-  function addFolder(id, name) {
-    _sync([...readSaved(userId).filter((f) => f.id !== id), { id, name }]);
+  async function addFolder(id, name) {
+    const next = [...folders.filter((f) => f.id !== id), { id, name }];
+    setFolders(next);
+    writeLocal(userId, next);
+    await updateSavedFolders(next).catch(() => {});
   }
-  function removeFolder(id) {
-    _sync(readSaved(userId).filter((f) => f.id !== id));
+
+  async function removeFolder(id) {
+    const next = folders.filter((f) => f.id !== id);
+    setFolders(next);
+    writeLocal(userId, next);
+    await updateSavedFolders(next).catch(() => {});
   }
 
   return { folders, addFolder, removeFolder };
@@ -54,7 +69,7 @@ export default function FolderPicker({ selectedId, onSelect, userId }) {
     setError("");
     try {
       const info = await getFolderInfo(id);
-      addFolder(info.id, info.name);
+      await addFolder(info.id, info.name);
       setInput("");
       setShowInput(false);
       onSelect(info.id, info.name);

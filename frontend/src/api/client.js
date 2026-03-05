@@ -99,6 +99,18 @@ export async function getFolderInfo(folderId) {
   return apiFetch(`${BASE}/drive/folder/${encodeURIComponent(folderId)}`);
 }
 
+export async function getSavedFolders() {
+  return apiFetch(`${BASE}/drive/saved-folders`);
+}
+
+export async function updateSavedFolders(folders) {
+  return apiFetch(`${BASE}/drive/saved-folders`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(folders),
+  });
+}
+
 export async function fetchPhotos(folderId) {
   return apiFetch(`${BASE}/drive/photos?folder_id=${encodeURIComponent(folderId)}`);
 }
