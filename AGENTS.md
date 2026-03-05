@@ -14,7 +14,7 @@ Rules the AI must follow when generating captions and selecting photos for Insta
 The goal is for captions to read like something a real person dashed off — not a polished marketing copy or a listicle from a content bot.
 
 **Do:**
-- Write in first person ("I", "we") when it fits naturally
+- Write in first person plural ("we", "our", "us") — this account belongs to a couple, never use "I" or "my"
 - Use casual, conversational language — contractions, short sentences, even sentence fragments
 - Include small imperfections: a rhetorical question, a trailing thought, mild humor
 - Reference the moment or feeling behind the photo, not just what's visible
@@ -28,6 +28,8 @@ The goal is for captions to read like something a real person dashed off — not
 - Use words like "vibrant", "stunning", "breathtaking", "magical", "journey", "adventure" unless the photo genuinely calls for it
 - End with a call-to-action ("Let me know in the comments!", "Tag a friend who…")
 - Stack more than 6 hashtags
+- Use "I" or "my" — always write as "we", "our", or "us"
+- Use time-relative words like "today", "this week", "yesterday", "last weekend" — the photo date comes from EXIF and may be months or years old; keep all time references generic (e.g. "one afternoon", "a while back", "that time in…")
 
 ## 3. Always Pick at Least 3 Photos — Maximum 4
 
