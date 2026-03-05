@@ -13,7 +13,7 @@ Google Drive folder → FastAPI backend → Gemini AI caption → Instagram Grap
 | Feature | Description |
 |---|---|
 | **Manual posting** | Pick photos from Drive, generate a caption, preview, and post |
-| **Carousel support** | Select up to 10 photos for an Instagram carousel |
+| **Carousel support** | Select 2–4 photos for an Instagram carousel |
 | **Auto-scheduler** | Set a time and cadence; the backend picks, captions, and posts automatically |
 | **Approval queue** | Optional: review AI-drafted posts before they go live |
 | **AI captions** | Google Gemini 2.5 Flash (free) with Claude Sonnet fallback |
@@ -23,6 +23,7 @@ Google Drive folder → FastAPI backend → Gemini AI caption → Instagram Grap
 | **Smart hashtags** | 5–8 hashtags mixing broad discovery tags with niche-specific ones |
 | **History tab** | Full log of every post attempt (success/failure, manual/scheduled) |
 | **Token auto-refresh** | Instagram long-lived token refreshed automatically before it expires |
+| **Transient error retry** | Graph API calls automatically retry with exponential backoff (5s/15s/30s) on transient Meta server errors |
 
 ---
 
@@ -136,7 +137,7 @@ npm run dev
 
 ### Manual tab
 1. Paste your Google Drive folder ID and click **Load Photos** (remembered across sessions)
-2. Click photos to select (up to 10 for a carousel)
+2. Click photos to select (2–4 for a carousel)
 3. Choose a tone and click **Generate Caption Via AI**
 4. The caption appears with `📅 date` and hashtags; detected GPS location shown as a `📍` chip
 5. Edit the caption if needed, then click **Post to Instagram** in the preview panel
