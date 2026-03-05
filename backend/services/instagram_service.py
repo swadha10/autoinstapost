@@ -15,6 +15,20 @@ GRAPH_BASE = "https://graph.facebook.com/v21.0"
 # Refresh when fewer than 7 days remain on the 60-day long-lived token
 REFRESH_THRESHOLD_DAYS = 7
 
+# Meta error codes that indicate a transient server-side problem (safe to retry)
+_TRANSIENT_META_CODES = {1, 2, 4, 17, 341}
+# Max attempts and backoff delays (seconds) for transient Graph API errors
+_RETRY_DELAYS = [5, 15, 30]
+
+
+def _is_transient_error(resp: httpx.Response) -> bool:
+    """Return True if the Meta API response signals a transient error worth retrying."""
+    try:
+        err = resp.json().get("error", {})
+        return bool(err.get("is_transient")) or err.get("code") in _TRANSIENT_META_CODES
+    except Exception:
+        return resp.status_code >= 500
+
 
 # ---------------------------------------------------------------------------
 # Token helpers — read from creds dict (DB) or env var fallback
@@ -250,13 +264,22 @@ def create_container(
     }
     if location_id:
         params["location_id"] = location_id
-    resp = httpx.post(f"{GRAPH_BASE}/{acct_id}/media", params=params, timeout=30)
-    if not resp.is_success:
+    last_error: Exception | None = None
+    for attempt, delay in enumerate([0] + _RETRY_DELAYS):
+        if delay:
+            logger.warning("Container creation transient error — retrying in %ds (attempt %d)…", delay, attempt)
+            time.sleep(delay)
+        resp = httpx.post(f"{GRAPH_BASE}/{acct_id}/media", params=params, timeout=30)
+        if resp.is_success:
+            data = resp.json()
+            if "id" not in data:
+                raise RuntimeError(f"Instagram container creation failed: {data}")
+            return data["id"]
+        if _is_transient_error(resp):
+            last_error = RuntimeError(f"Instagram container creation failed ({resp.status_code}): {resp.text}")
+            continue
         raise RuntimeError(f"Instagram container creation failed ({resp.status_code}): {resp.text}")
-    data = resp.json()
-    if "id" not in data:
-        raise RuntimeError(f"Instagram container creation failed: {data}")
-    return data["id"]
+    raise last_error  # type: ignore[misc]
 
 
 def wait_for_container(
@@ -294,20 +317,29 @@ def publish_container(
     user_id: int | None = None,
 ) -> str:
     acct_id = _account_id(creds)
-    resp = httpx.post(
-        f"{GRAPH_BASE}/{acct_id}/media_publish",
-        params={
-            "creation_id": container_id,
-            "access_token": get_valid_token(creds=creds, user_id=user_id),
-        },
-        timeout=30,
-    )
-    if not resp.is_success:
+    last_error: Exception | None = None
+    for attempt, delay in enumerate([0] + _RETRY_DELAYS):
+        if delay:
+            logger.warning("Publish transient error — retrying in %ds (attempt %d)…", delay, attempt)
+            time.sleep(delay)
+        resp = httpx.post(
+            f"{GRAPH_BASE}/{acct_id}/media_publish",
+            params={
+                "creation_id": container_id,
+                "access_token": get_valid_token(creds=creds, user_id=user_id),
+            },
+            timeout=30,
+        )
+        if resp.is_success:
+            data = resp.json()
+            if "id" not in data:
+                raise RuntimeError(f"Instagram publish failed: {data}")
+            return data["id"]
+        if _is_transient_error(resp):
+            last_error = RuntimeError(f"Instagram publish failed ({resp.status_code}): {resp.text}")
+            continue
         raise RuntimeError(f"Instagram publish failed ({resp.status_code}): {resp.text}")
-    data = resp.json()
-    if "id" not in data:
-        raise RuntimeError(f"Instagram publish failed: {data}")
-    return data["id"]
+    raise last_error  # type: ignore[misc]
 
 
 def post_photo(
@@ -328,21 +360,30 @@ def create_carousel_item_container(
     user_id: int | None = None,
 ) -> str:
     acct_id = _account_id(creds)
-    resp = httpx.post(
-        f"{GRAPH_BASE}/{acct_id}/media",
-        params={
-            "image_url": image_url,
-            "is_carousel_item": "true",
-            "access_token": get_valid_token(creds=creds, user_id=user_id),
-        },
-        timeout=30,
-    )
-    if not resp.is_success:
+    last_error: Exception | None = None
+    for attempt, delay in enumerate([0] + _RETRY_DELAYS):
+        if delay:
+            logger.warning("Carousel item creation transient error — retrying in %ds (attempt %d)…", delay, attempt)
+            time.sleep(delay)
+        resp = httpx.post(
+            f"{GRAPH_BASE}/{acct_id}/media",
+            params={
+                "image_url": image_url,
+                "is_carousel_item": "true",
+                "access_token": get_valid_token(creds=creds, user_id=user_id),
+            },
+            timeout=30,
+        )
+        if resp.is_success:
+            data = resp.json()
+            if "id" not in data:
+                raise RuntimeError(f"Carousel item creation failed: {data}")
+            return data["id"]
+        if _is_transient_error(resp):
+            last_error = RuntimeError(f"Carousel item creation failed ({resp.status_code}): {resp.text}")
+            continue
         raise RuntimeError(f"Carousel item creation failed ({resp.status_code}): {resp.text}")
-    data = resp.json()
-    if "id" not in data:
-        raise RuntimeError(f"Carousel item creation failed: {data}")
-    return data["id"]
+    raise last_error  # type: ignore[misc]
 
 
 def create_carousel_container(
@@ -361,13 +402,22 @@ def create_carousel_container(
     }
     if location_id:
         params["location_id"] = location_id
-    resp = httpx.post(f"{GRAPH_BASE}/{acct_id}/media", params=params, timeout=30)
-    if not resp.is_success:
+    last_error: Exception | None = None
+    for attempt, delay in enumerate([0] + _RETRY_DELAYS):
+        if delay:
+            logger.warning("Carousel container creation transient error — retrying in %ds (attempt %d)…", delay, attempt)
+            time.sleep(delay)
+        resp = httpx.post(f"{GRAPH_BASE}/{acct_id}/media", params=params, timeout=30)
+        if resp.is_success:
+            data = resp.json()
+            if "id" not in data:
+                raise RuntimeError(f"Carousel container creation failed: {data}")
+            return data["id"]
+        if _is_transient_error(resp):
+            last_error = RuntimeError(f"Carousel container creation failed ({resp.status_code}): {resp.text}")
+            continue
         raise RuntimeError(f"Carousel container creation failed ({resp.status_code}): {resp.text}")
-    data = resp.json()
-    if "id" not in data:
-        raise RuntimeError(f"Carousel container creation failed: {data}")
-    return data["id"]
+    raise last_error  # type: ignore[misc]
 
 
 def post_carousel(
@@ -377,8 +427,8 @@ def post_carousel(
     creds: dict | None = None,
     user_id: int | None = None,
 ) -> str:
-    if len(image_urls) < 2 or len(image_urls) > 10:
-        raise ValueError(f"Carousel requires 2–10 images, got {len(image_urls)}")
+    if len(image_urls) < 2 or len(image_urls) > 4:
+        raise ValueError(f"Carousel requires 2–4 images, got {len(image_urls)}")
 
     item_ids = []
     for url in image_urls:

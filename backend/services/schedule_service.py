@@ -499,7 +499,7 @@ def run_scheduled_job(user_id: int | None = None) -> None:
     locations = resolve_photo_locations(all_unused_ids, creds=creds, user_id=user_id)
     pool = select_by_location(unused, locations)
 
-    pick_count = min(10, len(pool))
+    pick_count = min(4, len(pool))
     selected = random.sample(pool, pick_count) if len(pool) > pick_count else list(pool)
     file_ids = [p["id"] for p in selected]
     file_names = [p.get("name", p["id"]) for p in selected]

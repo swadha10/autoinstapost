@@ -96,8 +96,8 @@ def _verify_image_url(url: str, base_url: str) -> None:
 def post_to_instagram(req: PostRequest, current_user: dict = Depends(get_current_user)):
     if not req.file_ids:
         raise HTTPException(status_code=400, detail="At least one file_id is required")
-    if len(req.file_ids) > 10:
-        raise HTTPException(status_code=400, detail="Instagram carousels support at most 10 images")
+    if len(req.file_ids) > 4:
+        raise HTTPException(status_code=400, detail="Carousels support at most 4 images")
 
     user_id = current_user["id"]
     creds = get_credentials(user_id)

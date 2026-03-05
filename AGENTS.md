@@ -29,11 +29,12 @@ The goal is for captions to read like something a real person dashed off — not
 - End with a call-to-action ("Let me know in the comments!", "Tag a friend who…")
 - Stack more than 6 hashtags
 
-## 3. Always Pick at Least 3 Photos
+## 3. Always Pick at Least 3 Photos — Maximum 4
 
-- Each scheduled post must include a minimum of 3 photos, posted as a carousel.
+- Each scheduled post must include a minimum of 3 photos and a maximum of 4 photos, posted as a carousel.
 - If fewer than 3 unposted photos remain in the folder, use however many are available rather than skipping the post entirely.
 - Never post a single photo from the scheduler — the experience should always feel like a curated set.
+- Never include more than 4 photos in a single carousel post.
 
 ## 4. Always Include the Photo Date
 
@@ -45,7 +46,7 @@ The goal is for captions to read like something a real person dashed off — not
 ## 6. Group Photos by Location — Never Mix Locations in One Post
 
 - Before selecting photos for a scheduled post, resolve the GPS location of every unposted photo using EXIF metadata (partial 128 KB download + persistent cache to avoid re-fetching).
-- Group photos by location name. Select **all photos from the location with the most unposted shots** for the post (up to the Instagram carousel maximum of 10).
+- Group photos by location name. Select **all photos from the location with the most unposted shots** for the post (up to a maximum of 4 per post).
 - Never mix photos taken at clearly different locations in a single post.
 - If no photo has GPS data, or no location group has ≥ 2 photos, fall back to random selection so the scheduler always makes progress.
 - Cache resolved locations in `data/photo_locations.json` (keyed by Drive file ID) so each photo is only scanned for GPS once.
