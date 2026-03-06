@@ -225,24 +225,36 @@ def get_status(request: Request, current_user: dict = Depends(get_current_user))
                        else f"Tunnel unreachable ({public_url}) — restart Cloudflare and update public_base_url",
         })
 
-    # 5. Instagram token valid
-    try:
-        from services.instagram_service import get_token_status
-        ts = get_token_status(creds=creds)
-        token_ok = ts.get("valid", False)
-        days = ts.get("days_left")
-        status_str = ts.get("status", "")
-        if status_str == "unknown":
-            msg = "Valid (expiry unknown — will be tracked after next use)"
-        elif token_ok and days is not None:
-            msg = f"Valid — {days} day{'s' if days != 1 else ''} left"
-        elif token_ok:
-            msg = "Valid"
-        else:
-            msg = "Expired — exchange a new token in the Manual tab"
-        checks.append({"name": "Instagram token", "ok": token_ok, "message": msg})
-    except Exception as e:
-        checks.append({"name": "Instagram token", "ok": False, "message": str(e)})
+    # 5. Instagram account connected
+    ig_account_id = (creds or {}).get("instagram_account_id", "").strip()
+    ig_token = (creds or {}).get("instagram_access_token", "").strip()
+    ig_connected = bool(ig_account_id) and bool(ig_token)
+    checks.append({
+        "name": "Instagram account",
+        "ok": ig_connected,
+        "message": f"Connected (account {ig_account_id})" if ig_connected
+                   else "Not connected — go to Setup and link your Instagram account",
+    })
+
+    # 6. Instagram token valid
+    if ig_connected:
+        try:
+            from services.instagram_service import get_token_status
+            ts = get_token_status(creds=creds)
+            token_ok = ts.get("valid", False)
+            days = ts.get("days_left")
+            status_str = ts.get("status", "")
+            if status_str == "unknown":
+                msg = "Valid (expiry unknown — will be tracked after next use)"
+            elif token_ok and days is not None:
+                msg = f"Valid — {days} day{'s' if days != 1 else ''} left"
+            elif token_ok:
+                msg = "Valid"
+            else:
+                msg = "Expired — exchange a new token in the Setup tab"
+            checks.append({"name": "Instagram token", "ok": token_ok, "message": msg})
+        except Exception as e:
+            checks.append({"name": "Instagram token", "ok": False, "message": str(e)})
 
     all_ok = all(c["ok"] for c in checks)
     return {"next_run": next_run, "checks": checks, "all_ok": all_ok, "upcoming_pool": upcoming_pool}
