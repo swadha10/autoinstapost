@@ -226,8 +226,8 @@ def get_status(request: Request, current_user: dict = Depends(get_current_user))
         })
 
     # 5. Instagram account connected
-    ig_account_id = (creds or {}).get("instagram_account_id", "").strip()
-    ig_token = (creds or {}).get("instagram_access_token", "").strip()
+    ig_account_id = ((creds or {}).get("instagram_account_id") or "").strip()
+    ig_token = ((creds or {}).get("instagram_access_token") or "").strip()
     ig_connected = bool(ig_account_id) and bool(ig_token)
     checks.append({
         "name": "Instagram account",
