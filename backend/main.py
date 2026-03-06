@@ -67,6 +67,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from fastapi.middleware.gzip import GZipMiddleware
+app.add_middleware(GZipMiddleware, minimum_size=1024)
+
 # Serve temp images so Instagram can fetch them (use ngrok / public URL in prod)
 app.mount("/temp", StaticFiles(directory=str(TEMP_DIR)), name="temp")
 
