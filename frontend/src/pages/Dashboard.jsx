@@ -44,10 +44,10 @@ const styles = {
     whiteSpace: "nowrap",
     flexShrink: 0,
   }),
-  main: { maxWidth: "1100px", margin: "0 auto", padding: "16px 12px", display: "flex", gap: "20px", flexWrap: "wrap" },
+  main: { maxWidth: "1100px", margin: "0 auto", padding: "14px 10px", display: "flex", gap: "16px", flexWrap: "wrap" },
   left: { flex: "1 1 300px", minWidth: 0 },
   right: { flex: "1 1 340px", minWidth: 0 },
-  card: { background: "#fff", borderRadius: "12px", padding: "16px", boxShadow: "0 2px 12px #0001", marginBottom: "16px" },
+  card: { background: "#fff", borderRadius: "12px", padding: "14px", boxShadow: "0 2px 12px #0001", marginBottom: "14px" },
   sectionTitle: { fontSize: "15px", fontWeight: 700, marginBottom: "12px", color: "#111" },
   error: {
     background: "#fff0f0",
@@ -59,7 +59,7 @@ const styles = {
     marginTop: "10px",
   },
   hint: { fontSize: "12px", color: "#999", marginTop: "6px" },
-  scheduleMain: { maxWidth: "720px", margin: "0 auto", padding: "16px 12px" },
+  scheduleMain: { maxWidth: "720px", margin: "0 auto", padding: "14px 10px" },
 };
 
 function loadFolderFromStorage(key) {

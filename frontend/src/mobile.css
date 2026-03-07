@@ -1,0 +1,31 @@
+/* Mobile UX improvements */
+
+/* Smooth scrolling for tab bar */
+.tab-bar {
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.tab-bar::-webkit-scrollbar { display: none; }
+
+/* Larger tap targets on mobile */
+@media (max-width: 640px) {
+  /* Prevent double-tap zoom on buttons */
+  button { touch-action: manipulation; }
+
+  /* Number inputs: hide browser spinners (use keyboard instead) */
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type="number"] { -moz-appearance: textfield; }
+
+  /* Ensure selects have enough height for touch */
+  select { min-height: 40px; }
+
+  /* Give textarea full width on mobile */
+  textarea { width: 100% !important; }
+
+  /* Prevent horizontal scroll from any element with overflow */
+  body { overflow-x: hidden; }
+}

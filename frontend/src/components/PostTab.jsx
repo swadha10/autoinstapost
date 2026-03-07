@@ -14,6 +14,7 @@ import {
 } from "../api/client";
 import FolderPicker from "./FolderPicker";
 import { useAuth } from "../context/AuthContext";
+import { useIsMobile } from "../hooks/useIsMobile";
 
 const TONES = ["engaging", "professional", "funny", "inspirational", "minimal"];
 const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -278,9 +279,12 @@ function CheckItem({ check }) {
 
 export default function PostTab() {
   const { user } = useAuth();
+  const isMobile = useIsMobile();
+  const cp = isMobile ? "14px" : "20px"; // card padding
 
   // ── Schedule config state ──────────────────────────────────────────────────
   const [config, setConfig] = useState(null);
+  const [configError, setConfigError] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState("");
@@ -300,7 +304,7 @@ export default function PostTab() {
 
   // ── Load config on mount ───────────────────────────────────────────────────
   useEffect(() => {
-    getScheduleConfig().then(setConfig).catch(() => {});
+    getScheduleConfig().then(setConfig).catch((e) => setConfigError(e.message));
     getServerTimezone().catch(() => {});
   }, []);
 
@@ -411,17 +415,19 @@ export default function PostTab() {
   const nextRun = status?.next_run ? formatNextRun(status.next_run) : null;
 
   if (!config) {
-    return <div style={{ padding: "40px", color: "#999" }}>Loading schedule settings…</div>;
+    return configError
+      ? <div style={{ padding: "24px 16px", color: "#c00", background: "#fff0f0", borderRadius: "10px", margin: "16px", fontSize: "14px" }}>Failed to load: {configError}</div>
+      : <div style={{ padding: "40px", color: "#999" }}>Loading schedule settings…</div>;
   }
 
   return (
     <div>
       {/* ── Schedule Settings ──────────────────────────────────────────────── */}
-      <div style={s.card}>
+      <div style={{ ...s.card, padding: cp }}>
         <div style={s.sectionTitle}>Schedule Settings</div>
 
         <div style={s.row}>
-          <span style={s.label}>Auto-schedule</span>
+          <span style={{ ...s.label, minWidth: isMobile ? "80px" : "110px" }}>Auto-schedule</span>
           <button style={s.toggle(config.enabled)} onClick={() => update("enabled", !config.enabled)}>
             {config.enabled ? "Enabled" : "Disabled"}
           </button>
@@ -604,7 +610,7 @@ export default function PostTab() {
 
       {/* ── Pending Approvals ─────────────────────────────────────────────── */}
       {config.require_approval && (
-        <div style={s.card}>
+        <div style={{ ...s.card, padding: cp }}>
           <div style={s.sectionTitle}>
             Pending Approvals{" "}
             <span style={{ fontWeight: 400, color: "#888", fontSize: "13px" }}>
@@ -646,8 +652,8 @@ export default function PostTab() {
       )}
 
       {/* ── Schedule Status ───────────────────────────────────────────────── */}
-      <div style={s.card}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+      <div style={{ ...s.card, padding: cp }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px", flexWrap: "wrap", gap: "8px" }}>
           <div style={{ ...s.sectionTitle, marginBottom: 0 }}>Schedule Status</div>
           <div style={{ display: "flex", gap: "8px" }}>
             <button
@@ -736,7 +742,7 @@ export default function PostTab() {
       </div>
 
       {/* ── Post History ──────────────────────────────────────────────────── */}
-      <div style={s.card}>
+      <div style={{ ...s.card, padding: cp }}>
         <div style={{ ...s.sectionTitle, marginBottom: "16px" }}>Post History</div>
 
         {!histLoading && !histError && history.length === 0 && (

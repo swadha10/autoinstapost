@@ -11,6 +11,7 @@ import {
 import { photoRawUrl } from "../api/client";
 import FolderPicker from "./FolderPicker";
 import { useAuth } from "../context/AuthContext";
+import { useIsMobile } from "../hooks/useIsMobile";
 
 const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -65,7 +66,7 @@ const s = {
     background: "#fff0f0", border: "1px solid #fcc", borderRadius: "8px",
     padding: "10px 14px", color: "#c00", fontSize: "13px", marginTop: "10px",
   },
-  photoGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(90px, 1fr))", gap: "8px", marginTop: "10px" },
+  photoGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: "8px", marginTop: "10px" },
   photoThumb: (selected) => ({
     width: "100%", aspectRatio: "9/16", objectFit: "cover", borderRadius: "8px",
     cursor: "pointer", border: selected ? "3px solid #833ab4" : "3px solid transparent",
@@ -110,7 +111,10 @@ const STATUS_BADGE = {
 
 export default function StoryTab() {
   const { user } = useAuth();
+  const isMobile = useIsMobile();
+  const cp = isMobile ? "14px" : "20px";
   const [config, setConfig] = useState(null);
+  const [configError, setConfigError] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState("");
@@ -138,7 +142,7 @@ export default function StoryTab() {
         setStoryFolderId(cfg.folder_id);
         loadPhotos(cfg.folder_id);
       }
-    }).catch(() => {});
+    }).catch((e) => setConfigError(e.message));
     refreshStatus();
   }, []);
 
@@ -227,14 +231,16 @@ export default function StoryTab() {
     }
   }
 
-  if (!config) return <div style={{ padding: "40px", color: "#999" }}>Loading story settings…</div>;
+  if (!config) return configError
+    ? <div style={{ padding: "24px 16px", color: "#c00", background: "#fff0f0", borderRadius: "10px", margin: "16px", fontSize: "14px" }}>Failed to load: {configError}</div>
+    : <div style={{ padding: "40px", color: "#999" }}>Loading story settings…</div>;
 
   const nextRun = status?.next_run ? formatNextRun(status.next_run) : null;
 
   return (
     <div>
       {/* ── Manual Post ── */}
-      <div style={s.card}>
+      <div style={{ ...s.card, padding: cp }}>
         <div style={s.sectionTitle}>Post a Story Now</div>
         <div style={{ marginBottom: "10px" }}>
           <span style={{ ...s.label, display: "block", marginBottom: "8px" }}>Story folder</span>
@@ -275,7 +281,7 @@ export default function StoryTab() {
       </div>
 
       {/* ── Story Schedule ── */}
-      <div style={s.card}>
+      <div style={{ ...s.card, padding: cp }}>
         <div style={s.sectionTitle}>Story Schedule</div>
 
         <div style={s.row}>
@@ -376,9 +382,9 @@ export default function StoryTab() {
       </div>
 
       {/* ── Status ── */}
-      <div style={s.card}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
-          <div style={s.sectionTitle}>Story Status</div>
+      <div style={{ ...s.card, padding: cp }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px", flexWrap: "wrap", gap: "8px" }}>
+          <div style={{ ...s.sectionTitle, marginBottom: 0 }}>Story Status</div>
           <div style={{ display: "flex", gap: "8px" }}>
             <button
               style={{ padding: "6px 14px", background: runningNow ? "#f5f5f5" : "#1a1a2e", color: runningNow ? "#aaa" : "#fff", border: "none", borderRadius: "8px", cursor: "pointer", fontSize: "13px", fontWeight: 600 }}
@@ -413,7 +419,7 @@ export default function StoryTab() {
       </div>
 
       {/* ── Story History ── */}
-      <div style={s.card}>
+      <div style={{ ...s.card, padding: cp }}>
         <div style={{ ...s.sectionTitle, marginBottom: "16px" }}>Story History</div>
         {history.length === 0 ? (
           <div style={{ color: "#999", fontSize: "14px" }}>No stories posted yet.</div>
