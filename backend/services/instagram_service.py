@@ -420,6 +420,41 @@ def create_carousel_container(
     raise last_error  # type: ignore[misc]
 
 
+def post_story(
+    image_url: str,
+    creds: dict | None = None,
+    user_id: int | None = None,
+) -> str:
+    """Post a single image as an Instagram Story."""
+    acct_id = _account_id(creds)
+    last_error: Exception | None = None
+    for attempt, delay in enumerate([0] + _RETRY_DELAYS):
+        if delay:
+            logger.warning("Story creation transient error — retrying in %ds (attempt %d)…", delay, attempt)
+            time.sleep(delay)
+        resp = httpx.post(
+            f"{GRAPH_BASE}/{acct_id}/media",
+            params={
+                "image_url": image_url,
+                "media_type": "STORIES",
+                "access_token": get_valid_token(creds=creds, user_id=user_id),
+            },
+            timeout=30,
+        )
+        if resp.is_success:
+            data = resp.json()
+            if "id" not in data:
+                raise RuntimeError(f"Story container creation failed: {data}")
+            container_id = data["id"]
+            wait_for_container(container_id, creds=creds, user_id=user_id)
+            return publish_container(container_id, creds=creds, user_id=user_id)
+        if _is_transient_error(resp):
+            last_error = RuntimeError(f"Story creation failed ({resp.status_code}): {resp.text}")
+            continue
+        raise RuntimeError(f"Story creation failed ({resp.status_code}): {resp.text}")
+    raise last_error  # type: ignore[misc]
+
+
 def post_carousel(
     image_urls: list[str],
     caption: str,

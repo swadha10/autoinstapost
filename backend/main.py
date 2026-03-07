@@ -25,6 +25,7 @@ from routers import caption, drive, instagram
 from routers.auth import router as auth_router
 from routers.photos import router as photos_router
 from routers.schedule import router as schedule_router
+from routers.stories import router as stories_router, _reschedule_story
 
 TEMP_DIR = Path("/tmp/autoinstapost")
 TEMP_DIR.mkdir(parents=True, exist_ok=True)
@@ -46,9 +47,13 @@ async def lifespan(app: FastAPI):
         for row in rows:
             user_id = row["id"]
             from services.schedule_service import load_config
+            from services.story_service import load_story_config
             config = load_config(user_id)
             if config.get("enabled"):
                 _reschedule_user(scheduler, config, user_id)
+            story_config = load_story_config(user_id)
+            if story_config.get("enabled"):
+                _reschedule_story(scheduler, story_config, user_id)
     except Exception as e:
         _log.warning("Could not restore user schedules: %s", e)
 
@@ -79,6 +84,7 @@ app.include_router(photos_router)
 app.include_router(caption.router)
 app.include_router(instagram.router)
 app.include_router(schedule_router)
+app.include_router(stories_router)
 
 
 @app.get("/health")

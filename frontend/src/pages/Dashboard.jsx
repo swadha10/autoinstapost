@@ -10,6 +10,7 @@ import PhotoGrid from "../components/PhotoGrid";
 import PostPreview from "../components/PostPreview";
 import ScheduleTab from "../components/ScheduleTab";
 import SettingsTab from "../components/SettingsTab";
+import StoryTab from "../components/StoryTab";
 import { useAuth } from "../context/AuthContext";
 
 const styles = {
@@ -326,6 +327,9 @@ export default function Dashboard() {
         <button style={styles.tab(activeTab === "schedule")} onClick={() => setActiveTab("schedule")}>
           Schedule
         </button>
+        <button style={styles.tab(activeTab === "stories")} onClick={() => setActiveTab("stories")}>
+          Stories
+        </button>
         <button style={styles.tab(activeTab === "history")} onClick={() => setActiveTab("history")}>
           History
         </button>
@@ -528,6 +532,10 @@ export default function Dashboard() {
       ) : activeTab === "schedule" ? (
         <div style={styles.scheduleMain}>
           <ScheduleTab />
+        </div>
+      ) : activeTab === "stories" ? (
+        <div style={styles.scheduleMain}>
+          <StoryTab />
         </div>
       ) : (
         <div style={styles.scheduleMain}>

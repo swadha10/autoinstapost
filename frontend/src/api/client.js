@@ -199,3 +199,37 @@ export async function getScheduleStatus() {
 export async function runScheduleNow() {
   return apiFetch(`${BASE}/schedule/run-now`, { method: "POST" });
 }
+
+// ── Stories ───────────────────────────────────────────────────────────────────
+
+export async function getStoryConfig() {
+  return apiFetch(`${BASE}/stories/config`);
+}
+
+export async function saveStoryConfig(config) {
+  return apiFetch(`${BASE}/stories/config`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(config),
+  });
+}
+
+export async function postStory(fileId) {
+  return apiFetch(`${BASE}/stories/post`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ file_id: fileId }),
+  });
+}
+
+export async function getStoryHistory() {
+  return apiFetch(`${BASE}/stories/history`);
+}
+
+export async function getStoryStatus() {
+  return apiFetch(`${BASE}/stories/status`);
+}
+
+export async function runStoryNow() {
+  return apiFetch(`${BASE}/stories/run-now`, { method: "POST" });
+}
