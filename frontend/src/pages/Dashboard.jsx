@@ -5,10 +5,9 @@ import { fetchAlbumPhotos, fetchPhotos, generateCaption, getInstagramAccount, ge
 import AlbumPicker from "../components/AlbumPicker";
 import CaptionEditor from "../components/CaptionEditor";
 import FolderPicker from "../components/FolderPicker";
-import HistoryTab from "../components/HistoryTab";
 import PhotoGrid from "../components/PhotoGrid";
 import PostPreview from "../components/PostPreview";
-import ScheduleTab from "../components/ScheduleTab";
+import PostTab from "../components/PostTab";
 import SettingsTab from "../components/SettingsTab";
 import StoryTab from "../components/StoryTab";
 import { useAuth } from "../context/AuthContext";
@@ -324,14 +323,11 @@ export default function Dashboard() {
         <button style={styles.tab(activeTab === "manual")} onClick={() => setActiveTab("manual")}>
           Manual
         </button>
-        <button style={styles.tab(activeTab === "schedule")} onClick={() => setActiveTab("schedule")}>
-          Schedule
+        <button style={styles.tab(activeTab === "post")} onClick={() => setActiveTab("post")}>
+          Post
         </button>
         <button style={styles.tab(activeTab === "stories")} onClick={() => setActiveTab("stories")}>
           Stories
-        </button>
-        <button style={styles.tab(activeTab === "history")} onClick={() => setActiveTab("history")}>
-          History
         </button>
       </div>
 
@@ -529,17 +525,13 @@ export default function Dashboard() {
             </div>
           </div>
         </main>
-      ) : activeTab === "schedule" ? (
+      ) : activeTab === "post" ? (
         <div style={styles.scheduleMain}>
-          <ScheduleTab />
-        </div>
-      ) : activeTab === "stories" ? (
-        <div style={styles.scheduleMain}>
-          <StoryTab />
+          <PostTab />
         </div>
       ) : (
         <div style={styles.scheduleMain}>
-          <HistoryTab />
+          <StoryTab />
         </div>
       )}
     </div>
