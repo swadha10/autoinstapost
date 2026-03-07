@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from auth import get_current_user
-from db import get_credentials
+from db import get_credentials, upsert_credentials
 from services.story_service import (
     load_story_config,
     load_story_history,
@@ -29,6 +29,7 @@ class StoryConfig(BaseModel):
     every_n_days: int = 1
     weekdays: list[int] = [0, 1, 2, 3, 4]
     timezone: str = "America/Los_Angeles"
+    source: str = "drive"  # "drive" or "gphotos_picker"
     folder_id: str = ""
 
 
@@ -82,6 +83,26 @@ def post_story_manual(req: ManualStoryRequest, current_user: dict = Depends(get_
             status="failed", source="manual", error=str(e),
             user_id=user_id,
         )
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ---------------------------------------------------------------------------
+# Story picker (separate session from feed picker)
+# ---------------------------------------------------------------------------
+
+@router.post("/picker/start")
+def start_story_picker(current_user: dict = Depends(get_current_user)):
+    """Create a Google Photos Picker session for story scheduling."""
+    user_id = current_user["id"]
+    creds = get_credentials(user_id)
+    try:
+        from services.photos_service import _get_access_token, create_picker_session
+        access_token = _get_access_token(creds)
+        session = create_picker_session(access_token)
+        session_id = session["id"]
+        upsert_credentials(user_id, {"google_story_picker_session_id": session_id})
+        return {"pickerUri": session["pickerUri"], "session_id": session_id}
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -141,27 +162,50 @@ def get_story_status(request: Request, current_user: dict = Depends(get_current_
                    else "Not connected — go to Setup and link your Instagram account",
     })
 
-    # 3. Story folder + fresh photos
-    folder_id = config.get("folder_id", "").strip()
-    checks.append({
-        "name": "Story folder",
-        "ok": bool(folder_id),
-        "message": "Folder configured" if folder_id else "No folder set — pick one above",
-    })
-    if folder_id:
-        try:
-            from services.drive_service import list_photos
-            photos = list_photos(folder_id, creds=creds)
-            posted = load_story_posted_ids(user_id)
-            fresh = [p for p in photos if p["id"] not in posted]
-            checks.append({
-                "name": "Fresh story photos",
-                "ok": len(fresh) > 0,
-                "message": f"{len(fresh)} unposted photo{'s' if len(fresh) != 1 else ''} available"
-                           if fresh else "All photos already used as stories — add more to the folder",
-            })
-        except Exception as e:
-            checks.append({"name": "Fresh story photos", "ok": False, "message": f"Drive error: {e}"})
+    # 3. Photo source
+    source = config.get("source", "drive")
+    if source == "gphotos_picker":
+        picker_session = ((creds or {}).get("google_story_picker_session_id") or "").strip()
+        checks.append({
+            "name": "Google Photos picker",
+            "ok": bool(picker_session),
+            "message": "Picker session active" if picker_session
+                       else "No picker session — open Google Photos Picker in Story Schedule above",
+        })
+        if picker_session:
+            try:
+                from services.photos_service import list_picker_items, _get_access_token as _gphotos_token
+                access_token = _gphotos_token(creds)
+                photos = list_picker_items(picker_session, access_token)
+                checks.append({
+                    "name": "Story photos available",
+                    "ok": len(photos) > 0,
+                    "message": f"{len(photos)} photo{'s' if len(photos) != 1 else ''} in picker selection"
+                               if photos else "No photos in picker selection — open picker and select photos",
+                })
+            except Exception as e:
+                checks.append({"name": "Story photos available", "ok": False, "message": f"Picker error: {e}"})
+    else:
+        folder_id = config.get("folder_id", "").strip()
+        checks.append({
+            "name": "Story folder",
+            "ok": bool(folder_id),
+            "message": "Folder configured" if folder_id else "No folder set — pick one above",
+        })
+        if folder_id:
+            try:
+                from services.drive_service import list_photos
+                photos = list_photos(folder_id, creds=creds)
+                posted = load_story_posted_ids(user_id)
+                fresh = [p for p in photos if p["id"] not in posted]
+                checks.append({
+                    "name": "Fresh story photos",
+                    "ok": len(fresh) > 0,
+                    "message": f"{len(fresh)} unposted photo{'s' if len(fresh) != 1 else ''} available"
+                               if fresh else "All photos already used as stories — add more to the folder",
+                })
+            except Exception as e:
+                checks.append({"name": "Fresh story photos", "ok": False, "message": f"Drive error: {e}"})
 
     # 4. Instagram token
     if ig_connected:

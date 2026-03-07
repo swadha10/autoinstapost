@@ -42,7 +42,7 @@ def init_db() -> None:
             )
         """)
         # Migrate existing DBs
-        for col in ["google_photos_refresh_token TEXT", "google_picker_session_id TEXT", "saved_drive_folders TEXT"]:
+        for col in ["google_photos_refresh_token TEXT", "google_picker_session_id TEXT", "saved_drive_folders TEXT", "google_story_picker_session_id TEXT"]:
             try:
                 conn.execute(f"ALTER TABLE credentials ADD COLUMN {col}")
                 conn.commit()
@@ -106,6 +106,7 @@ def upsert_credentials(user_id: int, updates: dict) -> None:
         "instagram_token_expires_at",
         "google_photos_refresh_token",
         "google_picker_session_id",
+        "google_story_picker_session_id",
         "saved_drive_folders",
     }
     filtered = {k: v for k, v in updates.items() if k in allowed}

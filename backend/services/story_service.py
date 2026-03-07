@@ -23,6 +23,7 @@ DEFAULT_STORY_CONFIG = {
     "every_n_days": 1,
     "weekdays": [0, 1, 2, 3, 4],
     "timezone": "America/Los_Angeles",
+    "source": "drive",
     "folder_id": "",
 }
 
@@ -250,39 +251,57 @@ def run_scheduled_story_job(user_id: int | None = None) -> None:
         logger.info("Story scheduler: disabled — skipping.")
         return
 
-    folder_id = config.get("folder_id", "").strip()
-    if not folder_id:
-        logger.warning("Story scheduler: no folder_id configured — skipping.")
-        return
+    source = config.get("source", "drive")
+    picker_session_id: str | None = None
 
-    from services.drive_service import list_photos
+    if source == "gphotos_picker":
+        picker_session_id = ((creds or {}).get("google_story_picker_session_id") or "").strip() or None
+        if not picker_session_id:
+            logger.warning("Story scheduler: source=gphotos_picker but no story picker session — skipping.")
+            return
+        try:
+            from services.photos_service import list_picker_items, _get_access_token as _gphotos_token
+            access_token = _gphotos_token(creds)
+            photos = list_picker_items(picker_session_id, access_token)
+        except Exception as e:
+            logger.error("Story scheduler: failed to list picker photos — %s", e)
+            return
+        if not photos:
+            logger.warning("Story scheduler: no photos in picker selection — skipping.")
+            return
+        selected = random.choice(photos)
+        file_id = selected["id"]
+        file_name = selected.get("filename", file_id)
+    else:
+        folder_id = config.get("folder_id", "").strip()
+        if not folder_id:
+            logger.warning("Story scheduler: no folder_id configured — skipping.")
+            return
+        from services.drive_service import list_photos
+        try:
+            photos = list_photos(folder_id, creds=creds)
+        except Exception as e:
+            logger.error("Story scheduler: failed to list photos — %s", e)
+            return
+        if not photos:
+            logger.warning("Story scheduler: no photos in folder — skipping.")
+            return
+        posted_ids = load_story_posted_ids(user_id)
+        INSTAGRAM_OK = {"image/jpeg", "image/png"}
+        unused = [
+            p for p in photos
+            if p["id"] not in posted_ids and p.get("mimeType", "") in INSTAGRAM_OK
+        ]
+        if not unused:
+            logger.warning("Story scheduler: all photos already used as stories — skipping.")
+            return
+        selected = random.choice(unused)
+        file_id = selected["id"]
+        file_name = selected.get("name", file_id)
+
     try:
-        photos = list_photos(folder_id, creds=creds)
-    except Exception as e:
-        logger.error("Story scheduler: failed to list photos — %s", e)
-        return
-
-    if not photos:
-        logger.warning("Story scheduler: no photos in folder — skipping.")
-        return
-
-    posted_ids = load_story_posted_ids(user_id)
-    INSTAGRAM_OK = {"image/jpeg", "image/png"}
-    unused = [
-        p for p in photos
-        if p["id"] not in posted_ids and p.get("mimeType", "") in INSTAGRAM_OK
-    ]
-
-    if not unused:
-        logger.warning("Story scheduler: all photos already used as stories — skipping.")
-        return
-
-    selected = random.choice(unused)
-    file_id = selected["id"]
-    file_name = selected.get("name", file_id)
-
-    try:
-        media_id = _post_story_image(file_id, creds=creds, user_id=user_id)
+        media_id = _post_story_image(file_id, creds=creds, user_id=user_id,
+                                     source=source, picker_session_id=picker_session_id)
         record_story_posted_id(file_id, user_id)
         log_story_attempt(
             file_id=file_id, file_name=file_name,

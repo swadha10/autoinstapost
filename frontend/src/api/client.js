@@ -202,6 +202,10 @@ export async function runScheduleNow() {
 
 // ── Stories ───────────────────────────────────────────────────────────────────
 
+export async function startStoryPicker() {
+  return apiFetch(`${BASE}/stories/picker/start`, { method: "POST" });
+}
+
 export async function getStoryConfig() {
   return apiFetch(`${BASE}/stories/config`);
 }

@@ -10,6 +10,7 @@ import {
   runStoryNow,
   saveStoryConfig,
   startGooglePicker,
+  startStoryPicker,
 } from "../api/client";
 import { photoRawUrl } from "../api/client";
 import FolderPicker from "./FolderPicker";
@@ -143,6 +144,9 @@ export default function StoryTab() {
   const [showAllHistory, setShowAllHistory] = useState(false);
   const [showAllPhotos, setShowAllPhotos] = useState(false);
   const [loadingStatus, setLoadingStatus] = useState(false);
+  // Schedule picker state (separate from manual picker)
+  const [schedPickerLoading, setSchedPickerLoading] = useState(false);
+  const [schedPickerOpen, setSchedPickerOpen] = useState(false);
 
   useEffect(() => {
     getStoryConfig().then((cfg) => {
@@ -258,6 +262,19 @@ export default function StoryTab() {
       setPostError(e.message);
     } finally {
       setPosting(false);
+    }
+  }
+
+  async function handleSchedulePicker() {
+    setSchedPickerLoading(true);
+    try {
+      const data = await startStoryPicker();
+      window.open(data.pickerUri, "_blank");
+      setSchedPickerOpen(true);
+    } catch (e) {
+      alert("Failed to open picker: " + e.message);
+    } finally {
+      setSchedPickerLoading(false);
     }
   }
 
@@ -512,20 +529,55 @@ export default function StoryTab() {
           </div>
         )}
 
-        {/* Story folder for scheduler */}
-        <div style={{ marginBottom: "14px" }}>
-          <span style={{ ...s.label, display: "block", marginBottom: "8px" }}>
-            Story folder
-            <span style={{ fontWeight: 400, color: "#999", fontSize: "12px", marginLeft: "8px" }}>
-              scheduler picks one photo randomly
-            </span>
-          </span>
-          <FolderPicker
-            selectedId={config.folder_id}
-            onSelect={id => update("folder_id", id)}
-            userId={user?.id}
-          />
+        {/* Photo source for scheduler */}
+        <div style={s.row}>
+          <span style={s.label}>Photo source</span>
+          <button style={s.toggle(config.source !== "gphotos_picker")} onClick={() => update("source", "drive")}>
+            Google Drive
+          </button>
+          <button style={s.toggle(config.source === "gphotos_picker")} onClick={() => update("source", "gphotos_picker")}>
+            Google Photos
+          </button>
         </div>
+
+        {config.source === "gphotos_picker" ? (
+          <div style={{ marginBottom: "14px" }}>
+            <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
+              <button
+                style={{
+                  padding: "8px 18px", borderRadius: "8px", border: "none",
+                  background: "#4285f4", color: "#fff", fontWeight: 600, fontSize: "13px",
+                  cursor: schedPickerLoading ? "not-allowed" : "pointer",
+                  opacity: schedPickerLoading ? 0.7 : 1,
+                }}
+                onClick={handleSchedulePicker}
+                disabled={schedPickerLoading}
+              >
+                {schedPickerLoading ? "Opening…" : schedPickerOpen ? "Re-open Picker" : "Open Google Photos Picker"}
+              </button>
+              {schedPickerOpen && (
+                <span style={{ fontSize: "12px", color: "#1a7a40", fontWeight: 600 }}>✓ Picker session active</span>
+              )}
+            </div>
+            <div style={{ fontSize: "12px", color: "#888", marginTop: "6px" }}>
+              Select photos — the scheduler will randomly pick one each run.
+            </div>
+          </div>
+        ) : (
+          <div style={{ marginBottom: "14px" }}>
+            <span style={{ ...s.label, display: "block", marginBottom: "8px" }}>
+              Story folder
+              <span style={{ fontWeight: 400, color: "#999", fontSize: "12px", marginLeft: "8px" }}>
+                scheduler picks one photo randomly
+              </span>
+            </span>
+            <FolderPicker
+              selectedId={config.folder_id}
+              onSelect={id => update("folder_id", id)}
+              userId={user?.id}
+            />
+          </div>
+        )}
 
         <div style={{ display: "flex", alignItems: "center", marginTop: "8px" }}>
           <button style={s.saveBtn(saving)} onClick={handleSave} disabled={saving}>
