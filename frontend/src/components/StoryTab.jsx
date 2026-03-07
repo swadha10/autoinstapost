@@ -133,6 +133,7 @@ export default function StoryTab() {
   const [history, setHistory] = useState([]);
   const [runningNow, setRunningNow] = useState(false);
   const [runMsg, setRunMsg] = useState("");
+  const [showAllHistory, setShowAllHistory] = useState(false);
   const [loadingStatus, setLoadingStatus] = useState(false);
 
   useEffect(() => {
@@ -420,11 +421,21 @@ export default function StoryTab() {
 
       {/* ── Story History ── */}
       <div style={{ ...s.card, padding: cp }}>
-        <div style={{ ...s.sectionTitle, marginBottom: "16px" }}>Story History</div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+          <div style={{ ...s.sectionTitle, marginBottom: 0 }}>Story History</div>
+          {history.length > 3 && (
+            <button
+              onClick={() => setShowAllHistory(v => !v)}
+              style={{ fontSize: "13px", color: "#833ab4", background: "none", border: "none", cursor: "pointer", fontWeight: 600, padding: 0 }}
+            >
+              {showAllHistory ? "Show less" : `Show all ${history.length}`}
+            </button>
+          )}
+        </div>
         {history.length === 0 ? (
           <div style={{ color: "#999", fontSize: "14px" }}>No stories posted yet.</div>
         ) : (
-          history.map(entry => {
+          (showAllHistory ? history : history.slice(0, 3)).map(entry => {
             const badge = STATUS_BADGE[entry.status] ?? STATUS_BADGE.failed;
             return (
               <div key={entry.id} style={{ display: "flex", gap: "12px", alignItems: "flex-start", padding: "12px 0", borderBottom: "1px solid #f0f0f0" }}>

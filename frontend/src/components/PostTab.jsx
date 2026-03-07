@@ -301,6 +301,7 @@ export default function PostTab() {
   const [histError, setHistError] = useState("");
   const [runningNow, setRunningNow] = useState(false);
   const [runMsg, setRunMsg] = useState("");
+  const [showAllHistory, setShowAllHistory] = useState(false);
 
   // ── Load config on mount ───────────────────────────────────────────────────
   useEffect(() => {
@@ -743,13 +744,23 @@ export default function PostTab() {
 
       {/* ── Post History ──────────────────────────────────────────────────── */}
       <div style={{ ...s.card, padding: cp }}>
-        <div style={{ ...s.sectionTitle, marginBottom: "16px" }}>Post History</div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+          <div style={{ ...s.sectionTitle, marginBottom: 0 }}>Post History</div>
+          {history.length > 3 && (
+            <button
+              onClick={() => setShowAllHistory(v => !v)}
+              style={{ fontSize: "13px", color: "#c13584", background: "none", border: "none", cursor: "pointer", fontWeight: 600, padding: 0 }}
+            >
+              {showAllHistory ? "Show less" : `Show all ${history.length}`}
+            </button>
+          )}
+        </div>
 
         {!histLoading && !histError && history.length === 0 && (
           <div style={s.emptyNote}>No posts yet. Posts will appear here once you start sharing.</div>
         )}
 
-        {history.map((entry) => {
+        {(showAllHistory ? history : history.slice(0, 3)).map((entry) => {
           const src = SOURCE_LABEL[entry.source] ?? SOURCE_LABEL.manual;
           const firstId = entry.file_ids?.[0];
           const multiCount = (entry.file_ids?.length ?? 1) > 1 ? entry.file_ids.length : null;
