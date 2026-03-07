@@ -239,6 +239,43 @@ export default function StoryTab() {
 
   return (
     <div>
+      {/* ── Status ── */}
+      <div style={{ ...s.card, padding: cp }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px", flexWrap: "wrap", gap: "8px" }}>
+          <div style={{ ...s.sectionTitle, marginBottom: 0 }}>Story Status</div>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button
+              style={{ padding: "6px 14px", background: runningNow ? "#f5f5f5" : "#1a1a2e", color: runningNow ? "#aaa" : "#fff", border: "none", borderRadius: "8px", cursor: "pointer", fontSize: "13px", fontWeight: 600 }}
+              onClick={handleRunNow}
+              disabled={runningNow || loadingStatus}
+            >
+              {runningNow ? "Running…" : "▶ Run Now"}
+            </button>
+            <button
+              style={{ padding: "6px 14px", background: "#f5f5f5", border: "1px solid #ddd", borderRadius: "8px", cursor: "pointer", fontSize: "13px", fontWeight: 600, color: "#444" }}
+              onClick={refreshStatus}
+              disabled={loadingStatus}
+            >
+              {loadingStatus ? "Loading…" : "Refresh"}
+            </button>
+          </div>
+        </div>
+
+        {runMsg && (
+          <div style={{ background: runMsg.startsWith("Error") ? "#fff0f0" : "#f0f7ff", border: `1px solid ${runMsg.startsWith("Error") ? "#fcc" : "#b8d4f8"}`, borderRadius: "8px", padding: "10px 14px", color: runMsg.startsWith("Error") ? "#c00" : "#1a4a80", fontSize: "13px", marginBottom: "12px" }}>
+            {runMsg}
+          </div>
+        )}
+
+        {status && (
+          <div style={{ background: "#f9f9f9", borderRadius: "10px", padding: "12px 14px", marginBottom: "14px", fontSize: "14px", fontWeight: 600, color: "#333" }}>
+            {nextRun ? `📅 Next story ${nextRun}` : "💤 No story schedule active"}
+          </div>
+        )}
+
+        {status?.checks?.map(c => <CheckItem key={c.name} check={c} />)}
+      </div>
+
       {/* ── Manual Post ── */}
       <div style={{ ...s.card, padding: cp }}>
         <div style={s.sectionTitle}>Post a Story Now</div>
@@ -379,43 +416,6 @@ export default function StoryTab() {
           {saved && <span style={s.savedBadge}>Saved!</span>}
         </div>
         {saveError && <div style={s.error}>{saveError}</div>}
-      </div>
-
-      {/* ── Status ── */}
-      <div style={{ ...s.card, padding: cp }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px", flexWrap: "wrap", gap: "8px" }}>
-          <div style={{ ...s.sectionTitle, marginBottom: 0 }}>Story Status</div>
-          <div style={{ display: "flex", gap: "8px" }}>
-            <button
-              style={{ padding: "6px 14px", background: runningNow ? "#f5f5f5" : "#1a1a2e", color: runningNow ? "#aaa" : "#fff", border: "none", borderRadius: "8px", cursor: "pointer", fontSize: "13px", fontWeight: 600 }}
-              onClick={handleRunNow}
-              disabled={runningNow || loadingStatus}
-            >
-              {runningNow ? "Running…" : "▶ Run Now"}
-            </button>
-            <button
-              style={{ padding: "6px 14px", background: "#f5f5f5", border: "1px solid #ddd", borderRadius: "8px", cursor: "pointer", fontSize: "13px", fontWeight: 600, color: "#444" }}
-              onClick={refreshStatus}
-              disabled={loadingStatus}
-            >
-              {loadingStatus ? "Loading…" : "Refresh"}
-            </button>
-          </div>
-        </div>
-
-        {runMsg && (
-          <div style={{ background: runMsg.startsWith("Error") ? "#fff0f0" : "#f0f7ff", border: `1px solid ${runMsg.startsWith("Error") ? "#fcc" : "#b8d4f8"}`, borderRadius: "8px", padding: "10px 14px", color: runMsg.startsWith("Error") ? "#c00" : "#1a4a80", fontSize: "13px", marginBottom: "12px" }}>
-            {runMsg}
-          </div>
-        )}
-
-        {status && (
-          <div style={{ background: "#f9f9f9", borderRadius: "10px", padding: "12px 14px", marginBottom: "14px", fontSize: "14px", fontWeight: 600, color: "#333" }}>
-            {nextRun ? `📅 Next story ${nextRun}` : "💤 No story schedule active"}
-          </div>
-        )}
-
-        {status?.checks?.map(c => <CheckItem key={c.name} check={c} />)}
       </div>
 
       {/* ── Story History ── */}

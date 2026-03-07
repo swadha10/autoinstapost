@@ -422,6 +422,96 @@ export default function PostTab() {
 
   return (
     <div>
+      {/* ── Schedule Status ───────────────────────────────────────────────── */}
+      <div style={{ ...s.card, padding: cp }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px", flexWrap: "wrap", gap: "8px" }}>
+          <div style={{ ...s.sectionTitle, marginBottom: 0 }}>Schedule Status</div>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button
+              style={{ ...s.refreshBtn, background: runningNow ? "#f5f5f5" : "#1a1a2e", color: runningNow ? "#aaa" : "#fff", borderColor: "#1a1a2e" }}
+              onClick={handleRunNow}
+              disabled={runningNow || histLoading}
+            >
+              {runningNow ? "Running…" : "▶ Run Now"}
+            </button>
+            <button style={s.refreshBtn} onClick={fetchHistory} disabled={histLoading}>
+              {histLoading ? "Loading…" : "Refresh"}
+            </button>
+          </div>
+        </div>
+
+        {histError && (
+          <div style={{ background: "#fff0f0", border: "1px solid #fcc", borderRadius: "8px", padding: "10px 14px", color: "#c00", fontSize: "13px", marginBottom: "12px" }}>
+            {histError}
+          </div>
+        )}
+
+        {runMsg && (
+          <div style={{
+            background: runMsg.startsWith("Error") ? "#fff0f0" : "#f0f7ff",
+            border: `1px solid ${runMsg.startsWith("Error") ? "#fcc" : "#b8d4f8"}`,
+            borderRadius: "8px", padding: "10px 14px",
+            color: runMsg.startsWith("Error") ? "#c00" : "#1a4a80",
+            fontSize: "13px", marginBottom: "12px",
+          }}>
+            {runMsg}
+          </div>
+        )}
+
+        {status && (
+          <div style={{
+            background: nextRun ? (status.all_ok ? "#f0f7ff" : "#fffbf0") : "#f5f5f5",
+            border: `1px solid ${nextRun ? (status.all_ok ? "#b8d4f8" : "#f5d88a") : "#e0e0e0"}`,
+            borderRadius: "10px", padding: "14px 16px", marginBottom: "16px",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <span style={{ fontSize: "24px" }}>{nextRun ? (status.all_ok ? "🕐" : "⚠️") : "💤"}</span>
+              <div>
+                {nextRun ? (
+                  <>
+                    <div style={{ fontSize: "14px", fontWeight: 700, color: "#111" }}>Next post {nextRun.label}</div>
+                    {nextRun.sub && <div style={{ fontSize: "12px", color: "#888", marginTop: "2px" }}>{nextRun.sub}</div>}
+                    {!status.all_ok && (
+                      <div style={{ fontSize: "12px", color: "#a86000", marginTop: "4px" }}>
+                        Fix the issues below before the next run
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div style={{ fontSize: "14px", fontWeight: 600, color: "#888" }}>
+                    No scheduled post — enable auto-schedule in Schedule Settings below
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {nextRun && status.upcoming_pool?.length > 0 && (
+              <div style={{ marginTop: "12px" }}>
+                <div style={{ fontSize: "11px", fontWeight: 600, color: "#888", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                  Will randomly pick 3 from {status.upcoming_pool.length} available
+                </div>
+                <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                  {status.upcoming_pool.map((photo) => (
+                    <img
+                      key={photo.id}
+                      src={photoRawUrl(photo.id)}
+                      alt={photo.name}
+                      title={photo.name}
+                      style={{ width: "52px", height: "52px", objectFit: "cover", borderRadius: "6px", background: "#e0e0e0" }}
+                      onError={(e) => { e.target.style.display = "none"; }}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {status?.checks && (
+          <div>{status.checks.map((c) => <CheckItem key={c.name} check={c} />)}</div>
+        )}
+      </div>
+
       {/* ── Schedule Settings ──────────────────────────────────────────────── */}
       <div style={{ ...s.card, padding: cp }}>
         <div style={s.sectionTitle}>Schedule Settings</div>
@@ -650,96 +740,6 @@ export default function PostTab() {
           )}
         </div>
       )}
-
-      {/* ── Schedule Status ───────────────────────────────────────────────── */}
-      <div style={{ ...s.card, padding: cp }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px", flexWrap: "wrap", gap: "8px" }}>
-          <div style={{ ...s.sectionTitle, marginBottom: 0 }}>Schedule Status</div>
-          <div style={{ display: "flex", gap: "8px" }}>
-            <button
-              style={{ ...s.refreshBtn, background: runningNow ? "#f5f5f5" : "#1a1a2e", color: runningNow ? "#aaa" : "#fff", borderColor: "#1a1a2e" }}
-              onClick={handleRunNow}
-              disabled={runningNow || histLoading}
-            >
-              {runningNow ? "Running…" : "▶ Run Now"}
-            </button>
-            <button style={s.refreshBtn} onClick={fetchHistory} disabled={histLoading}>
-              {histLoading ? "Loading…" : "Refresh"}
-            </button>
-          </div>
-        </div>
-
-        {histError && (
-          <div style={{ background: "#fff0f0", border: "1px solid #fcc", borderRadius: "8px", padding: "10px 14px", color: "#c00", fontSize: "13px", marginBottom: "12px" }}>
-            {histError}
-          </div>
-        )}
-
-        {runMsg && (
-          <div style={{
-            background: runMsg.startsWith("Error") ? "#fff0f0" : "#f0f7ff",
-            border: `1px solid ${runMsg.startsWith("Error") ? "#fcc" : "#b8d4f8"}`,
-            borderRadius: "8px", padding: "10px 14px",
-            color: runMsg.startsWith("Error") ? "#c00" : "#1a4a80",
-            fontSize: "13px", marginBottom: "12px",
-          }}>
-            {runMsg}
-          </div>
-        )}
-
-        {status && (
-          <div style={{
-            background: nextRun ? (status.all_ok ? "#f0f7ff" : "#fffbf0") : "#f5f5f5",
-            border: `1px solid ${nextRun ? (status.all_ok ? "#b8d4f8" : "#f5d88a") : "#e0e0e0"}`,
-            borderRadius: "10px", padding: "14px 16px", marginBottom: "16px",
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-              <span style={{ fontSize: "24px" }}>{nextRun ? (status.all_ok ? "🕐" : "⚠️") : "💤"}</span>
-              <div>
-                {nextRun ? (
-                  <>
-                    <div style={{ fontSize: "14px", fontWeight: 700, color: "#111" }}>Next post {nextRun.label}</div>
-                    {nextRun.sub && <div style={{ fontSize: "12px", color: "#888", marginTop: "2px" }}>{nextRun.sub}</div>}
-                    {!status.all_ok && (
-                      <div style={{ fontSize: "12px", color: "#a86000", marginTop: "4px" }}>
-                        Fix the issues below before the next run
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div style={{ fontSize: "14px", fontWeight: 600, color: "#888" }}>
-                    No scheduled post — enable auto-schedule above
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {nextRun && status.upcoming_pool?.length > 0 && (
-              <div style={{ marginTop: "12px" }}>
-                <div style={{ fontSize: "11px", fontWeight: 600, color: "#888", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                  Will randomly pick 3 from {status.upcoming_pool.length} available
-                </div>
-                <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-                  {status.upcoming_pool.map((photo) => (
-                    <img
-                      key={photo.id}
-                      src={photoRawUrl(photo.id)}
-                      alt={photo.name}
-                      title={photo.name}
-                      style={{ width: "52px", height: "52px", objectFit: "cover", borderRadius: "6px", background: "#e0e0e0" }}
-                      onError={(e) => { e.target.style.display = "none"; }}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {status?.checks && (
-          <div>{status.checks.map((c) => <CheckItem key={c.name} check={c} />)}</div>
-        )}
-      </div>
 
       {/* ── Post History ──────────────────────────────────────────────────── */}
       <div style={{ ...s.card, padding: cp }}>
