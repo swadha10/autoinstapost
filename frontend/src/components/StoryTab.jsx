@@ -134,6 +134,7 @@ export default function StoryTab() {
   const [runningNow, setRunningNow] = useState(false);
   const [runMsg, setRunMsg] = useState("");
   const [showAllHistory, setShowAllHistory] = useState(false);
+  const [showAllPhotos, setShowAllPhotos] = useState(false);
   const [loadingStatus, setLoadingStatus] = useState(false);
 
   useEffect(() => {
@@ -297,7 +298,7 @@ export default function StoryTab() {
               Select one photo — it will be cropped to 9:16 portrait for Stories
             </div>
             <div style={s.photoGrid}>
-              {photos.map(p => (
+              {(showAllPhotos ? photos : photos.slice(0, 5)).map(p => (
                 <img
                   key={p.id}
                   src={photoRawUrl(p.id)}
@@ -309,6 +310,14 @@ export default function StoryTab() {
                 />
               ))}
             </div>
+            {photos.length > 5 && (
+              <button
+                onClick={() => setShowAllPhotos(v => !v)}
+                style={{ marginTop: "8px", width: "100%", padding: "7px", background: "none", border: "1px solid #e0e0e0", borderRadius: "8px", cursor: "pointer", fontSize: "13px", fontWeight: 600, color: "#666" }}
+              >
+                {showAllPhotos ? "Show less" : `Show ${photos.length - 5} more`}
+              </button>
+            )}
             <button style={s.postBtn(!selectedPhotoId || posting)} onClick={handlePostStory} disabled={!selectedPhotoId || posting}>
               {posting ? "Posting story…" : selectedPhotoId ? "Post as Story" : "Select a photo above"}
             </button>

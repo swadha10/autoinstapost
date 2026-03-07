@@ -1,4 +1,6 @@
 import { useState } from "react";
+
+const PREVIEW_COUNT = 5;
 import { photoRawUrl, pickerThumbUrl } from "../api/client";
 
 function resolveThumbUrl(photo) {
@@ -68,7 +70,11 @@ const s = {
   },
 };
 
-function Section({ label, count, fresh, children }) {
+function Section({ label, count, fresh, photos, renderCard }) {
+  const [showAll, setShowAll] = useState(false);
+  const visible = showAll ? photos : photos.slice(0, PREVIEW_COUNT);
+  const hidden = photos.length - PREVIEW_COUNT;
+
   return (
     <>
       <div style={s.sectionHeader}>
@@ -76,7 +82,20 @@ function Section({ label, count, fresh, children }) {
         <span style={s.sectionCount}>{count}</span>
         <div style={s.divider} />
       </div>
-      <div style={s.grid}>{children}</div>
+      <div style={s.grid}>{visible.map(renderCard)}</div>
+      {photos.length > PREVIEW_COUNT && (
+        <button
+          onClick={() => setShowAll(v => !v)}
+          style={{
+            marginTop: "8px", width: "100%", padding: "7px",
+            background: "none", border: "1px solid #e0e0e0",
+            borderRadius: "8px", cursor: "pointer",
+            fontSize: "13px", fontWeight: 600, color: "#666",
+          }}
+        >
+          {showAll ? "Show less" : `Show ${hidden} more`}
+        </button>
+      )}
     </>
   );
 }
@@ -127,41 +146,25 @@ export default function PhotoGrid({ photos, postedIds = [], selectedIds = [], on
       )}
 
       {fresh.length > 0 && (
-        <Section label="Fresh shots" count={fresh.length} fresh={true}>
-          {fresh.map((photo) => {
-            const order = selectedIds.indexOf(photo.id) + 1; // 0 if not selected
-            return (
-              <PhotoCard
-                key={photo.id}
-                photo={photo}
-                order={order}
-                dimmed={false}
-                shared={false}
-                onToggle={onToggle}
-                onMark={onMarkPosted}
-              />
-            );
-          })}
-        </Section>
+        <Section
+          label="Fresh shots" count={fresh.length} fresh={true}
+          photos={fresh}
+          renderCard={(photo) => {
+            const order = selectedIds.indexOf(photo.id) + 1;
+            return <PhotoCard key={photo.id} photo={photo} order={order} dimmed={false} shared={false} onToggle={onToggle} onMark={onMarkPosted} />;
+          }}
+        />
       )}
 
       {shared.length > 0 && (
-        <Section label="Already shared" count={shared.length} fresh={false}>
-          {shared.map((photo) => {
+        <Section
+          label="Already shared" count={shared.length} fresh={false}
+          photos={shared}
+          renderCard={(photo) => {
             const order = selectedIds.indexOf(photo.id) + 1;
-            return (
-              <PhotoCard
-                key={photo.id}
-                photo={photo}
-                order={order}
-                dimmed={true}
-                shared={true}
-                onToggle={onToggle}
-                onMark={onUnmarkPosted}
-              />
-            );
-          })}
-        </Section>
+            return <PhotoCard key={photo.id} photo={photo} order={order} dimmed={true} shared={true} onToggle={onToggle} onMark={onUnmarkPosted} />;
+          }}
+        />
       )}
     </div>
   );
