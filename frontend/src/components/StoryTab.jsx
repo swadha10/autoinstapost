@@ -4,9 +4,12 @@ import {
   getStoryConfig,
   getStoryHistory,
   getStoryStatus,
+  getPickerPhotos,
+  pickerThumbUrl,
   postStory,
   runStoryNow,
   saveStoryConfig,
+  startGooglePicker,
 } from "../api/client";
 import { photoRawUrl } from "../api/client";
 import FolderPicker from "./FolderPicker";
@@ -120,10 +123,14 @@ export default function StoryTab() {
   const [saveError, setSaveError] = useState("");
 
   // Manual post state
+  const [manualSource, setManualSource] = useState("drive");
   const [storyFolderId, setStoryFolderId] = useState("");
   const [photos, setPhotos] = useState([]);
   const [loadingPhotos, setLoadingPhotos] = useState(false);
   const [selectedPhotoId, setSelectedPhotoId] = useState("");
+  const [pickerSessionId, setPickerSessionId] = useState(null);
+  const [pickerLoading, setPickerLoading] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [posting, setPosting] = useState(false);
   const [postMsg, setPostMsg] = useState("");
   const [postError, setPostError] = useState("");
@@ -202,13 +209,48 @@ export default function StoryTab() {
     }
   }
 
+  async function handlePickFromGoogle() {
+    setPickerLoading(true);
+    setPostError("");
+    setPhotos([]);
+    setSelectedPhotoId("");
+    setPickerOpen(false);
+    try {
+      const data = await startGooglePicker();
+      setPickerSessionId(data.session_id);
+      window.open(data.pickerUri, "_blank");
+      setPickerOpen(true);
+    } catch (e) {
+      setPostError(e.message);
+    } finally {
+      setPickerLoading(false);
+    }
+  }
+
+  async function loadPickerPhotos() {
+    setPickerLoading(true);
+    setPostError("");
+    setPhotos([]);
+    setSelectedPhotoId("");
+    try {
+      const data = await getPickerPhotos();
+      const photosWithThumb = data.photos.map(p => ({ ...p, thumbnailUrl: pickerThumbUrl(p.id) }));
+      setPhotos(photosWithThumb.filter(p => p.mimeType?.startsWith("image/")));
+      setPickerSessionId(data.session_id);
+    } catch (e) {
+      setPostError(e.message);
+    } finally {
+      setPickerLoading(false);
+    }
+  }
+
   async function handlePostStory() {
     if (!selectedPhotoId) return;
     setPosting(true);
     setPostMsg("");
     setPostError("");
     try {
-      await postStory(selectedPhotoId);
+      await postStory(selectedPhotoId, manualSource, manualSource === "gphotos_picker" ? pickerSessionId : null);
       setPostMsg("Story posted!");
       setSelectedPhotoId("");
       setTimeout(refreshStatus, 3000);
@@ -281,14 +323,80 @@ export default function StoryTab() {
       {/* ── Manual Post ── */}
       <div style={{ ...s.card, padding: cp }}>
         <div style={s.sectionTitle}>Post a Story Now</div>
-        <div style={{ marginBottom: "10px" }}>
-          <span style={{ ...s.label, display: "block", marginBottom: "8px" }}>Story folder</span>
-          <FolderPicker
-            selectedId={storyFolderId}
-            onSelect={(id) => { setStoryFolderId(id); loadPhotos(id); setSelectedPhotoId(""); }}
-            userId={user?.id}
-          />
+
+        {/* Source toggle */}
+        <div style={{ display: "flex", gap: "8px", marginBottom: "14px" }}>
+          {[["drive", "Google Drive"], ["gphotos_picker", "Google Photos"]].map(([val, label]) => (
+            <button
+              key={val}
+              onClick={() => { setManualSource(val); setPhotos([]); setSelectedPhotoId(""); setPostError(""); setPickerOpen(false); }}
+              style={{
+                flex: 1, padding: "8px", border: "2px solid",
+                borderColor: manualSource === val ? "#833ab4" : "#ddd",
+                borderRadius: "8px", cursor: "pointer", fontSize: "13px", fontWeight: 600,
+                background: manualSource === val ? "#f5f0ff" : "#fff",
+                color: manualSource === val ? "#833ab4" : "#555",
+              }}
+            >
+              {label}
+            </button>
+          ))}
         </div>
+
+        {manualSource === "drive" ? (
+          <div style={{ marginBottom: "10px" }}>
+            <span style={{ ...s.label, display: "block", marginBottom: "8px" }}>Story folder</span>
+            <FolderPicker
+              selectedId={storyFolderId}
+              onSelect={(id) => { setStoryFolderId(id); loadPhotos(id); setSelectedPhotoId(""); }}
+              userId={user?.id}
+            />
+          </div>
+        ) : (
+          <div style={{ marginBottom: "10px" }}>
+            <button
+              onClick={handlePickFromGoogle}
+              disabled={pickerLoading}
+              style={{
+                width: "100%", padding: "12px",
+                background: pickerLoading ? "#ccc" : "linear-gradient(135deg,#4285f4,#34a853)",
+                color: "#fff", border: "none", borderRadius: "8px",
+                cursor: pickerLoading ? "not-allowed" : "pointer",
+                fontSize: "14px", fontWeight: 700,
+              }}
+            >
+              {pickerLoading ? "Opening…" : pickerOpen ? "Reopen Google Photos Picker" : "Open Google Photos Picker"}
+            </button>
+            {pickerOpen && photos.length === 0 && (
+              <div style={{ marginTop: "10px" }}>
+                <div style={{ fontSize: "13px", color: "#555", marginBottom: "8px" }}>
+                  Pick your photo in the Google Photos tab, then click below:
+                </div>
+                <button
+                  onClick={loadPickerPhotos}
+                  disabled={pickerLoading}
+                  style={{
+                    width: "100%", padding: "11px", background: "#111",
+                    color: "#fff", border: "none", borderRadius: "8px",
+                    cursor: "pointer", fontSize: "14px", fontWeight: 700,
+                  }}
+                >
+                  {pickerLoading ? "Loading…" : "Done picking — Load Photo"}
+                </button>
+              </div>
+            )}
+            {photos.length > 0 && (
+              <div style={{ marginTop: "8px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ fontSize: "12px", color: "#1a7a40", fontWeight: 600 }}>
+                  ✓ {photos.length} photo{photos.length !== 1 ? "s" : ""} loaded
+                </div>
+                <button onClick={handlePickFromGoogle} style={{ fontSize: "12px", color: "#833ab4", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>
+                  Pick again
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {loadingPhotos && <div style={{ fontSize: "13px", color: "#999", marginTop: "8px" }}>Loading photos…</div>}
 
@@ -301,7 +409,7 @@ export default function StoryTab() {
               {(showAllPhotos ? photos : photos.slice(0, 5)).map(p => (
                 <img
                   key={p.id}
-                  src={photoRawUrl(p.id)}
+                  src={p.thumbnailUrl || photoRawUrl(p.id)}
                   alt={p.name}
                   title={p.name}
                   style={s.photoThumb(selectedPhotoId === p.id)}

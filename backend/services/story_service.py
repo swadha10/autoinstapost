@@ -177,10 +177,11 @@ def _post_story_image(
     file_id: str,
     creds: dict | None = None,
     user_id: int | None = None,
+    source: str = "drive",
+    picker_session_id: str | None = None,
 ) -> str:
-    """Download from Drive, crop to 9:16, serve publicly, post as Story."""
+    """Download image (Drive or Google Photos picker), crop to 9:16, post as Story."""
     import httpx as _httpx
-    from services.drive_service import download_photo
     from services.instagram_service import post_story
 
     base_url = (
@@ -194,7 +195,14 @@ def _post_story_image(
             "Update it in Setup and retry."
         )
 
-    image_bytes, _ = download_photo(file_id, creds=creds)
+    if source == "gphotos_picker":
+        if not picker_session_id:
+            raise RuntimeError("picker_session_id required for gphotos_picker source")
+        from services.photos_service import download_picker_photo
+        image_bytes, _ = download_picker_photo(file_id, picker_session_id, creds)
+    else:
+        from services.drive_service import download_photo
+        image_bytes, _ = download_photo(file_id, creds=creds)
     story_bytes = _crop_for_story(image_bytes)
 
     filename = f"{uuid.uuid4().hex}.jpg"

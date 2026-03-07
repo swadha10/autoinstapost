@@ -34,6 +34,8 @@ class StoryConfig(BaseModel):
 
 class ManualStoryRequest(BaseModel):
     file_id: str
+    source: str = "drive"  # "drive" or "gphotos_picker"
+    picker_session_id: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -63,7 +65,10 @@ def post_story_manual(req: ManualStoryRequest, current_user: dict = Depends(get_
     user_id = current_user["id"]
     creds = get_credentials(user_id)
     try:
-        media_id = _post_story_image(req.file_id, creds=creds, user_id=user_id)
+        media_id = _post_story_image(
+            req.file_id, creds=creds, user_id=user_id,
+            source=req.source, picker_session_id=req.picker_session_id,
+        )
         record_story_posted_id(req.file_id, user_id)
         log_story_attempt(
             file_id=req.file_id, file_name=req.file_id,

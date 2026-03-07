@@ -214,11 +214,11 @@ export async function saveStoryConfig(config) {
   });
 }
 
-export async function postStory(fileId) {
+export async function postStory(fileId, source = "drive", pickerSessionId = null) {
   return apiFetch(`${BASE}/stories/post`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ file_id: fileId }),
+    body: JSON.stringify({ file_id: fileId, source, picker_session_id: pickerSessionId }),
   });
 }
 
